@@ -155,4 +155,4 @@ SecondHandMarketMaker/
 | POST | `/api/analyze-upload` | Condition analysis from uploaded image |
 | POST | `/api/verify-condition` | Condition check from image URL |
 
-Full interactive docs: **http://localhost:8000/docs** (when the backend is running).
+Full interactive docs: **https://secondhandmarketmaker.onrender.com/docs**
