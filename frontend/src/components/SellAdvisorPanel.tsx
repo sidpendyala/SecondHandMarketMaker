@@ -23,6 +23,9 @@ interface SellAdvisorPanelProps {
   priceRefreshing?: boolean;
   onProductSuggestionAccepted?: (detectedProduct: string) => void;
   hasUserInput?: boolean;
+  imagePreview?: string | null;
+  conditionResult?: ConditionResult | null;
+  onImagePreviewChange?: (preview: string | null) => void;
 }
 
 export default function SellAdvisorPanel({
@@ -36,6 +39,9 @@ export default function SellAdvisorPanel({
   priceRefreshing,
   onProductSuggestionAccepted,
   hasUserInput,
+  imagePreview,
+  conditionResult,
+  onImagePreviewChange,
 }: SellAdvisorPanelProps) {
   const confColor = {
     high: "text-[#33cc33]",
@@ -80,6 +86,9 @@ export default function SellAdvisorPanel({
             uploadImage={uploadImage}
             searchQuery={data.query}
             onProductSuggestionAccepted={onProductSuggestionAccepted}
+            initialPreview={imagePreview}
+            initialResult={conditionResult}
+            onPreviewChange={onImagePreviewChange}
           />
         </div>
         <div className="bg-black p-0">

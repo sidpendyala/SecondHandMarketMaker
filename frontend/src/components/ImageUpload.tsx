@@ -15,6 +15,9 @@ interface ImageUploadProps {
   isLoading?: boolean;
   searchQuery?: string;
   onProductSuggestionAccepted?: (detectedProduct: string) => void;
+  initialPreview?: string | null;
+  initialResult?: ConditionResult | null;
+  onPreviewChange?: (preview: string | null) => void;
 }
 
 export default function ImageUpload({
@@ -23,11 +26,14 @@ export default function ImageUpload({
   isLoading: externalLoading,
   searchQuery,
   onProductSuggestionAccepted,
+  initialPreview,
+  initialResult,
+  onPreviewChange,
 }: ImageUploadProps) {
   const [dragOver, setDragOver] = useState(false);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [preview, setPreview] = useState<string | null>(initialPreview ?? null);
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<ConditionResult | null>(null);
+  const [result, setResult] = useState<ConditionResult | null>(initialResult ?? null);
   const [error, setError] = useState<string | null>(null);
   const [suggestionDismissed, setSuggestionDismissed] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -42,7 +48,11 @@ export default function ImageUpload({
       }
 
       const reader = new FileReader();
-      reader.onload = (e) => setPreview(e.target?.result as string);
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        setPreview(dataUrl);
+        onPreviewChange?.(dataUrl);
+      };
       reader.readAsDataURL(file);
 
       setLoading(true);
@@ -88,8 +98,9 @@ export default function ImageUpload({
     setResult(null);
     setError(null);
     setSuggestionDismissed(false);
+    onPreviewChange?.(null);
     if (inputRef.current) inputRef.current.value = "";
-  }, []);
+  }, [onPreviewChange]);
 
   const ratingColor = (rating: number) => {
     if (rating >= 8) return "text-[#33cc33]";

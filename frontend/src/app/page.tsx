@@ -54,20 +54,29 @@ export default function Home() {
   const [searchBarQuery, setSearchBarQuery] = useState<string | undefined>(
     undefined
   );
+  // Lifted image state so it survives panel unmount/remount during loading
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [conditionResult, setConditionResult] =
+    useState<ConditionResult | null>(null);
   const currentSellQuery = useRef<string>("");
 
   const handleSearch = useCallback(
-    async (query: string) => {
+    async (query: string, keepImage = false) => {
       setIsLoading(true);
       setShowResults(false);
       setError(null);
       setBuyData(null);
       setSellData(null);
       setProductFields([]);
-      setSellCondition(undefined);
-      setSellDetails({});
-      setDetectedAttrs({});
       setShowFiltered(false);
+
+      if (!keepImage) {
+        setSellCondition(undefined);
+        setSellDetails({});
+        setDetectedAttrs({});
+        setImagePreview(null);
+        setConditionResult(null);
+      }
 
       try {
         if (mode === "buy") {
@@ -77,7 +86,11 @@ export default function Home() {
           currentSellQuery.current = query;
 
           const [advisorResult, fieldsResult] = await Promise.allSettled([
-            sellAdvisor(query),
+            sellAdvisor(
+              query,
+              keepImage ? sellCondition : undefined,
+              keepImage ? sellDetails : undefined
+            ),
             (async () => {
               setFieldsLoading(true);
               try {
@@ -108,7 +121,7 @@ export default function Home() {
         setIsLoading(false);
       }
     },
-    [mode]
+    [mode, sellCondition, sellDetails]
   );
 
   const handleModeChange = useCallback((newMode: Mode) => {
@@ -120,6 +133,8 @@ export default function Home() {
     setSellCondition(undefined);
     setSellDetails({});
     setDetectedAttrs({});
+    setImagePreview(null);
+    setConditionResult(null);
   }, []);
 
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -155,6 +170,7 @@ export default function Home() {
   const handleSellCondition = useCallback(
     (result: ConditionResult) => {
       setSellCondition(result.rating);
+      setConditionResult(result);
       refreshSellAdvisor(result.rating, sellDetails);
 
       if (
@@ -177,10 +193,12 @@ export default function Home() {
 
   const handleProductSuggestion = useCallback(
     (detectedProduct: string) => {
-      if (detectedProduct && detectedProduct !== currentSellQuery.current) {
-        setSearchBarQuery(detectedProduct);
-        handleSearch(detectedProduct);
-      }
+      if (!detectedProduct || detectedProduct === currentSellQuery.current)
+        return;
+
+      // Update search bar, keep image/condition, run full loading screen
+      setSearchBarQuery(detectedProduct);
+      handleSearch(detectedProduct, true);
     },
     [handleSearch]
   );
@@ -365,6 +383,9 @@ export default function Home() {
               sellCondition !== undefined ||
               Object.values(sellDetails).some((v) => !!v)
             }
+            imagePreview={imagePreview}
+            conditionResult={conditionResult}
+            onImagePreviewChange={setImagePreview}
           />
         )}
 
