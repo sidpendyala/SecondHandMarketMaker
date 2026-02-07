@@ -56,6 +56,7 @@ export default function Home() {
   const [searchBarQuery, setSearchBarQuery] = useState<string | undefined>(
     undefined
   );
+  const [searchBarClearTrigger, setSearchBarClearTrigger] = useState(0);
   // Lifted image state so it survives panel unmount/remount during loading
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [conditionResult, setConditionResult] =
@@ -224,12 +225,13 @@ export default function Home() {
     setConditionResult(null);
   }, []);
 
-  /** Home: clear everything but keep current mode (buy/sell) */
+  /** Home: clear results and form state but keep current mode (stay on sell if you were on sell). */
   const handleHomeClick = useCallback(() => {
     setBuyData(null);
     setSellData(null);
     setError(null);
     setSearchBarQuery(undefined);
+    setSearchBarClearTrigger((t) => t + 1);
     setRefinementFields([]);
     setRefinementSelections({});
     setProductFields([]);
@@ -241,6 +243,8 @@ export default function Home() {
     setShowResults(false);
     setShowFiltered(false);
     setIsLoading(false);
+    setPriceRefreshing(false);
+    // mode is intentionally NOT reset — user stays on buy or sell
   }, []);
 
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -345,6 +349,7 @@ export default function Home() {
         onModeChange={handleModeChange}
         externalQuery={searchBarQuery}
         onHomeClick={handleHomeClick}
+        clearTrigger={searchBarClearTrigger}
       />
 
       {/* Main: grows to fill space so footer stays at bottom */}

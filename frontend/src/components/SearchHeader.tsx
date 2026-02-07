@@ -15,6 +15,8 @@ interface SearchHeaderProps {
   externalQuery?: string;
   /** Called when the logo/title is clicked — reset to home/default state */
   onHomeClick?: () => void;
+  /** Increment to force-clear the search input (e.g. on home click when externalQuery didn't change) */
+  clearTrigger?: number;
 }
 
 export default function SearchHeader({
@@ -24,6 +26,7 @@ export default function SearchHeader({
   onModeChange,
   externalQuery,
   onHomeClick,
+  clearTrigger,
 }: SearchHeaderProps) {
   const [query, setQuery] = useState("");
   const [inputFocused, setInputFocused] = useState(false);
@@ -46,6 +49,12 @@ export default function SearchHeader({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [externalQuery]);
+
+  useEffect(() => {
+    if (clearTrigger !== undefined && clearTrigger > 0) {
+      setQuery("");
+    }
+  }, [clearTrigger]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
