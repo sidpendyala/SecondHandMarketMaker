@@ -164,9 +164,9 @@ Return ONLY a JSON object (no markdown, no code fences):
 }
 
 RULES:
-- Match the EXACT product and generation the user asked for. NEVER return a newer generation's price for an older one (e.g. if the user asks for "AirPods Pro 2", do NOT return AirPods Pro 3's $249 — Pro 2 is superseded, so set discontinued: true and do not show that price).
+- Match the EXACT product and generation the user asked for. NEVER return a newer generation's price for an older one (e.g. "AirPods Pro 2" must not get Pro 3's $249; "MacBook Pro M2" must not get M3/M4's price — set discontinued: true for superseded models).
 - Use USD. If you only know another currency, convert to USD at current approximate rates.
-- discontinued: true if the manufacturer/brand NO LONGER sells this exact product. This includes: officially discontinued, end-of-life, or SUPERSEDED BY A NEWER MODEL (e.g. "iPad Air 5th Gen", "AirPods Pro 2" are discontinued because Apple now sells newer generations). When in doubt that the brand still sells this specific model, set discontinued to true.
+- discontinued: true if the manufacturer/brand NO LONGER sells this exact product. Be STRICT. This includes: officially discontinued, end-of-life, or SUPERSEDED BY A NEWER MODEL OR CHIP. Examples that must be discontinued: "iPad Air 5th Gen", "AirPods Pro 2", "MacBook Pro M2", "MacBook Pro M1", "MacBook Air M1" (Apple now sells M3/M4; M1/M2 MacBooks are discontinued). When in doubt that the brand still sells this specific model/chip/generation, set discontinued to true.
 - price_usd must be the MSRP for THIS exact model only when the brand still sells it; use null if discontinued or no reliable price. If discontinued is true, we ignore price_usd and do not show MSRP.
 - Prefer the brand's own US MSRP or the price on the brand's official site. Do NOT use the cheapest eBay/Amazon listing.
 - For products with multiple SKUs (e.g. different storage), use the most common or base model's price.

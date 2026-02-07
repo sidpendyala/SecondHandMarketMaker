@@ -182,7 +182,7 @@ async def market_maker(query: str = Query(..., min_length=2, description="Produc
     1. Fetch sold history
     2. Calculate fair market value
     3. Fetch active listings
-    4. Identify deals (20%+ undervalued)
+    4. Identify deals (15%+ undervalued)
     5. Concurrent AI condition analysis on all deals
     6. Condition-based filtering and scoring
     """

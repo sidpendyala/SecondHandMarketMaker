@@ -480,7 +480,10 @@ export default function Home() {
               ) : (
                 <div className="border border-dashed border-[#2a2520] py-10 text-center">
                   <p className="text-xs text-[#6b6560]">
-                    NO DEALS BELOW 20% MARKET VALUE
+                    NO DEALS BELOW 15% MARKET VALUE
+                  </p>
+                  <p className="mt-1 text-[10px] text-[#5a544e]">
+                    Deals = listings 15%+ below fair value (scams & mismatches filtered)
                   </p>
                 </div>
               )}

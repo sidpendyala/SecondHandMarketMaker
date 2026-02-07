@@ -76,9 +76,9 @@ def _normalize_dedup_key(url: str, title: str, price: float, image: str = "") ->
     return base, title_price_key, image_price_key
 
 
-def find_deals(active_items: list[dict], fair_value: float, threshold: float = 0.20) -> list[dict]:
+def find_deals(active_items: list[dict], fair_value: float, threshold: float = 0.15) -> list[dict]:
     """
-    Filter active listings that are priced at least `threshold` (default 20 %)
+    Filter active listings that are priced at least `threshold` (default 15 %)
     below the Fair Market Value. Deduplicates by normalized URL and by
     (title, price) so the same listing never appears twice.
 
