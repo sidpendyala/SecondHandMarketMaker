@@ -203,7 +203,7 @@ def _fetch_search(ebay_url: str) -> list[dict]:
         f"{BASE_URL}/search_get.php",
         headers=_get_headers(),
         params={"url": ebay_url},
-        timeout=30,
+        timeout=25,
     )
     resp.raise_for_status()
     data = resp.json()
@@ -254,7 +254,7 @@ def scrape_listing_condition(listing_url: str) -> dict | None:
             f"{BASE_URL}/product_get.php",
             headers=_get_headers(),
             params={"url": listing_url},
-            timeout=30,
+            timeout=20,
         )
         resp.raise_for_status()
         body = _get_product_body(resp)

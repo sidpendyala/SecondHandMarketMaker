@@ -179,23 +179,38 @@ class RefineQueryResponse(BaseModel):
 async def market_maker(query: str = Query(..., min_length=2, description="Product search query")):
     """
     The Quant + The Scout + The Visionary pipeline:
-    1. Fetch sold history
-    2. Calculate fair market value
-    3. Fetch active listings
-    4. Identify deals (15%+ undervalued)
-    5. Concurrent AI condition analysis on all deals
-    6. Condition-based filtering and scoring
+    1. Fetch sold + active + brand price in parallel
+    2. Valuation, deals, filter, condition scrapes, scoring
     """
-    # Step 1 – The Quant: sold history
-    try:
-        sold_items = search_sold(query)
-    except RuntimeError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except _requests.RequestException as e:
-        raise HTTPException(
-            status_code=502,
-            detail=f"eBay search failed: {e}. Check RAPID_API_KEY and RapidAPI subscription.",
-        )
+    # Step 1 – Run sold, active, and brand price in parallel for faster load
+    async def _sold():
+        try:
+            return await asyncio.to_thread(search_sold, query)
+        except RuntimeError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except _requests.RequestException as e:
+            raise HTTPException(
+                status_code=502,
+                detail=f"eBay search failed: {e}. Check RAPID_API_KEY and RapidAPI subscription.",
+            )
+
+    async def _active():
+        try:
+            return await asyncio.to_thread(search_active, query)
+        except RuntimeError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except _requests.RequestException as e:
+            raise HTTPException(status_code=502, detail=f"eBay search failed: {e}")
+
+    async def _brand_price():
+        try:
+            return await asyncio.to_thread(get_brand_retail_price, query)
+        except Exception:
+            return None
+
+    sold_items, active_items, manufacturer_price = await asyncio.gather(
+        _sold(), _active(), _brand_price()
+    )
 
     # Step 2 – Valuation
     valuation = calculate_fair_value(sold_items)
@@ -206,20 +221,6 @@ async def market_maker(query: str = Query(..., min_length=2, description="Produc
             status_code=404,
             detail=f"Could not determine fair value for '{query}'. Try a different search.",
         )
-
-    # Step 3 – The Scout: active listings
-    try:
-        active_items = search_active(query)
-    except RuntimeError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except _requests.RequestException as e:
-        raise HTTPException(status_code=502, detail=f"eBay search failed: {e}")
-
-    # Step 3b – Brand/manufacturer retail price (what the brand sells for) via OpenAI or Gemini
-    try:
-        manufacturer_price = get_brand_retail_price(query)
-    except Exception:
-        manufacturer_price = None
 
     # Step 4 – Filter deals (price threshold)
     deals = find_deals(active_items, fair_value)
@@ -239,8 +240,7 @@ async def market_maker(query: str = Query(..., min_length=2, description="Produc
     # First pass: many deals already have condition from search subTitles
     # Second pass: for deals missing condition, scrape the listing page
     needs_scrape = [d for d in enriched if d.get("condition_rating") is None]
-    # Cap scrapes so we don't hammer RapidAPI (slow product_get.php) and avoid timeouts
-    max_condition_scrapes = 10
+    max_condition_scrapes = 5  # cap to keep load time down (product_get.php is slow)
     if len(needs_scrape) > max_condition_scrapes:
         needs_scrape = needs_scrape[:max_condition_scrapes]
 
