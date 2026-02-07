@@ -2,16 +2,11 @@
 
 import { useState, useCallback, useRef } from "react";
 import {
-  Camera,
   Upload,
   Loader2,
-  CheckCircle2,
   X,
   Lightbulb,
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import type { ConditionResult } from "@/lib/types";
 
 interface ImageUploadProps {
@@ -42,16 +37,14 @@ export default function ImageUpload({
   const handleFile = useCallback(
     async (file: File) => {
       if (!file.type.startsWith("image/")) {
-        setError("Please upload an image file (JPEG, PNG, etc.)");
+        setError("INVALID FILE FORMAT");
         return;
       }
 
-      // Show preview
       const reader = new FileReader();
       reader.onload = (e) => setPreview(e.target?.result as string);
       reader.readAsDataURL(file);
 
-      // Upload and analyze
       setLoading(true);
       setError(null);
       setResult(null);
@@ -63,7 +56,7 @@ export default function ImageUpload({
         onConditionResult(conditionResult);
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "Failed to analyze image"
+          err instanceof Error ? err.message : "ANALYSIS FAILED"
         );
       } finally {
         setLoading(false);
@@ -99,13 +92,12 @@ export default function ImageUpload({
   }, []);
 
   const ratingColor = (rating: number) => {
-    if (rating >= 8) return "bg-emerald-500";
-    if (rating >= 6) return "bg-blue-500";
-    if (rating >= 4) return "bg-amber-500";
-    return "bg-red-500";
+    if (rating >= 8) return "text-[#33cc33]";
+    if (rating >= 6) return "text-[#32cd32]";
+    if (rating >= 4) return "text-[#39ff14]";
+    return "text-[#ff3333]";
   };
 
-  // Should we show the product suggestion?
   const showSuggestion =
     result?.detected_product &&
     !suggestionDismissed &&
@@ -113,157 +105,131 @@ export default function ImageUpload({
     result.source !== "mock";
 
   return (
-    <Card className="border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-      <CardContent className="p-5">
-        <h4 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
-          <Camera className="mr-1.5 inline-block h-4 w-4" />
-          Upload Product Photo
-        </h4>
+    <div className="border border-[#2a2520] bg-[#0d0b09] p-3">
+      <div className="mb-2 text-[10px] font-bold text-[#39ff14]">
+        PHOTO UPLOAD
+      </div>
 
-        {!preview ? (
-          /* Drop zone */
-          <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragOver(true);
-            }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={handleDrop}
-            onClick={() => inputRef.current?.click()}
-            className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-10 transition-colors ${
-              dragOver
-                ? "border-amber-400 bg-amber-50 dark:border-amber-600 dark:bg-amber-950/20"
-                : "border-slate-300 bg-slate-50 hover:border-slate-400 dark:border-slate-700 dark:bg-slate-800/50 dark:hover:border-slate-600"
-            }`}
-          >
-            <Upload className="mb-2 h-8 w-8 text-slate-400" />
-            <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
-              Drag & drop your photo here
-            </p>
-            <p className="mt-1 text-xs text-slate-400">
-              or click to browse (JPEG, PNG)
-            </p>
-            <input
-              ref={inputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleInputChange}
+      {!preview ? (
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={handleDrop}
+          onClick={() => inputRef.current?.click()}
+          className={`flex cursor-pointer flex-col items-center justify-center border border-dashed py-8 transition-colors ${
+            dragOver
+              ? "border-[#39ff14] bg-[#39ff14]/5"
+              : "border-[#2a2520] hover:border-[#6b6560]"
+          }`}
+        >
+          <Upload className="mb-1.5 h-5 w-5 text-[#6b6560]" />
+          <p className="text-[11px] text-[#6b6560]">DROP IMAGE OR CLICK</p>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleInputChange}
+          />
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <div className="relative overflow-hidden">
+            <img
+              src={preview}
+              alt="Product"
+              className="h-40 w-full object-cover"
             />
+            <button
+              onClick={handleReset}
+              className="absolute top-1 right-1 bg-black/80 p-1 text-[#e8e6e3] hover:bg-black"
+            >
+              <X className="h-3 w-3" />
+            </button>
           </div>
-        ) : (
-          /* Preview + result */
-          <div className="space-y-3">
-            <div className="relative overflow-hidden rounded-xl">
-              <img
-                src={preview}
-                alt="Product preview"
-                className="h-48 w-full object-cover"
-              />
-              <Button
-                size="sm"
-                variant="secondary"
-                className="absolute top-2 right-2 h-7 w-7 rounded-full bg-black/50 p-0 text-white hover:bg-black/70"
-                onClick={handleReset}
-              >
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            </div>
 
-            {/* Loading */}
-            {isProcessing && (
-              <div className="flex items-center justify-center gap-2 py-4">
-                <Loader2 className="h-5 w-5 animate-spin text-amber-500" />
-                <span className="text-sm text-slate-500">
-                  Analyzing condition...
+          {isProcessing && (
+            <div className="flex items-center gap-2 py-2">
+              <Loader2 className="h-3 w-3 animate-spin text-[#39ff14]" />
+              <span className="text-[10px] text-[#6b6560]">ANALYZING...</span>
+            </div>
+          )}
+
+          {error && (
+            <div className="border border-[#ff3333]/30 bg-[#ff3333]/5 px-2 py-1.5 text-[10px] text-[#ff3333]">
+              {error}
+            </div>
+          )}
+
+          {result && !isProcessing && (
+            <div className="border border-[#2a2520] bg-black p-2.5">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-[#6b6560]">CONDITION</span>
+                <span className={`text-sm font-bold ${ratingColor(result.rating)}`}>
+                  {result.rating}/10
+                </span>
+                <span className="text-[11px] text-[#e8e6e3]">
+                  {result.label?.toUpperCase()}
                 </span>
               </div>
-            )}
+              {result.notes && (
+                <p className="mt-1 text-[10px] text-[#6b6560]">
+                  {result.notes}
+                </p>
+              )}
 
-            {/* Error */}
-            {error && (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400">
-                {error}
-              </div>
-            )}
-
-            {/* Result */}
-            {result && !isProcessing && (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/50">
-                {/* Condition */}
-                <div className="flex items-center gap-3">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                  <div className="flex items-center gap-2">
-                    <Badge
-                      className={`border-0 text-white ${ratingColor(result.rating)}`}
-                    >
-                      {result.rating}/10
-                    </Badge>
-                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                      {result.label}
-                    </span>
-                  </div>
-                </div>
-                {result.notes && (
-                  <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                    {result.notes}
-                  </p>
-                )}
-
-                {/* Product suggestion — dismissible */}
-                {showSuggestion && (
-                  <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-900/50 dark:bg-blue-950/30">
-                    <div className="flex items-start gap-2">
-                      <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-medium text-blue-700 dark:text-blue-300">
-                          We think this looks like:
+              {showSuggestion && (
+                <div className="mt-2 border border-[#32cd32]/20 bg-[#32cd32]/5 p-2">
+                  <div className="flex items-start gap-2">
+                    <Lightbulb className="mt-0.5 h-3 w-3 shrink-0 text-[#32cd32]" />
+                    <div className="flex-1">
+                      <p className="text-[10px] text-[#6b6560]">DETECTED:</p>
+                      <p className="text-[11px] font-bold text-[#32cd32]">
+                        {result.detected_product}
+                      </p>
+                      {searchQuery && (
+                        <p className="mt-0.5 text-[9px] text-[#6b6560]">
+                          SEARCHED: &quot;{searchQuery.toUpperCase()}&quot;
                         </p>
-                        <p className="mt-0.5 text-sm font-semibold text-blue-800 dark:text-blue-200">
-                          {result.detected_product}
-                        </p>
-                        {searchQuery && (
-                          <p className="mt-1 text-[11px] text-blue-500 dark:text-blue-400">
-                            You searched for &quot;{searchQuery}&quot;
-                          </p>
-                        )}
-                        <div className="mt-2 flex items-center gap-2">
-                          {onProductSuggestionAccepted && (
-                            <button
-                              onClick={() => {
-                                onProductSuggestionAccepted(
-                                  result.detected_product!
-                                );
-                                setSuggestionDismissed(true);
-                              }}
-                              className="rounded-md bg-blue-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700"
-                            >
-                              Use this instead
-                            </button>
-                          )}
+                      )}
+                      <div className="mt-1.5 flex gap-1">
+                        {onProductSuggestionAccepted && (
                           <button
-                            onClick={() => setSuggestionDismissed(true)}
-                            className="rounded-md bg-white px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200 transition-colors hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-400 dark:ring-slate-700 dark:hover:bg-slate-700"
+                            onClick={() => {
+                              onProductSuggestionAccepted(
+                                result.detected_product!
+                              );
+                              setSuggestionDismissed(true);
+                            }}
+                            className="bg-[#39ff14] px-2 py-0.5 text-[9px] font-bold text-black hover:bg-[#32cd32]"
                           >
-                            Ignore
+                            USE THIS
                           </button>
-                        </div>
+                        )}
+                        <button
+                          onClick={() => setSuggestionDismissed(true)}
+                          className="border border-[#2a2520] px-2 py-0.5 text-[9px] text-[#6b6560] hover:text-[#e8e6e3]"
+                        >
+                          IGNORE
+                        </button>
                       </div>
                     </div>
                   </div>
-                )}
+                </div>
+              )}
 
-                {result.source === "mock" && (
-                  <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-400">
-                    Demo mode – Add OpenAI billing credits or GEMINI_API_KEY for
-                    real AI vision
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+              {result.source === "mock" && (
+                <div className="mt-1.5 border border-[#32cd32]/20 bg-[#32cd32]/5 px-2 py-1 text-[9px] text-[#32cd32]">
+                  DEMO MODE — ADD API KEYS FOR REAL AI
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

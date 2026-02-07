@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, TrendingUp, Loader2, ShoppingCart, DollarSign } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 
 type Mode = "buy" | "sell";
 
@@ -23,7 +22,6 @@ export default function SearchHeader({
 }: SearchHeaderProps) {
   const [query, setQuery] = useState("");
 
-  // Sync search bar text when parent pushes a new query (e.g. AI suggestion accepted)
   useEffect(() => {
     if (externalQuery !== undefined && externalQuery !== query) {
       setQuery(externalQuery);
@@ -47,112 +45,77 @@ export default function SearchHeader({
   ];
 
   return (
-    <div className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 px-4 pb-16 pt-20 sm:px-6 lg:px-8">
-      {/* Background decoration */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-emerald-500/10 blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-blue-500/10 blur-3xl" />
-        <div className="absolute top-1/2 left-1/2 h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-500/5 blur-3xl" />
-      </div>
+    <div className="border-b border-[#2a2520] bg-black px-4 py-3">
+      <div className="mx-auto max-w-6xl">
+        {/* Top row: brand + mode tabs */}
+        <div className="mb-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-bold text-[#39ff14]">
+              MARKETMAKER
+            </span>
+            <span className="text-xs text-[#6b6560]">
+              AI DEAL INTELLIGENCE
+            </span>
+          </div>
 
-      <div className="relative mx-auto max-w-4xl text-center">
-        {/* Logo / Brand */}
-        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-1.5 text-sm text-emerald-400">
-          <TrendingUp className="h-4 w-4" />
-          AI-Powered Deal Intelligence
-        </div>
-
-        <h1 className="mb-4 text-4xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl">
-          Market
-          <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
-            Maker
-          </span>
-        </h1>
-        <p className="mx-auto mb-8 max-w-2xl text-lg text-slate-400">
-          {mode === "buy"
-            ? "Find underpriced deals before anyone else. Our AI agents scan sold history, calculate true market value, and surface arbitrage opportunities."
-            : "Price your items to sell fast and maximize profit. Get fee breakdowns and market-backed pricing tiers."}
-        </p>
-
-        {/* Buy / Sell Toggle */}
-        <div className="mb-8 inline-flex items-center rounded-xl border border-slate-700/50 bg-slate-800/60 p-1 backdrop-blur-xl">
-          <button
-            onClick={() => onModeChange("buy")}
-            className={`flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all ${
-              mode === "buy"
-                ? "bg-emerald-600 text-white shadow-lg"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <ShoppingCart className="h-4 w-4" />
-            Buy
-          </button>
-          <button
-            onClick={() => onModeChange("sell")}
-            className={`flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all ${
-              mode === "sell"
-                ? "bg-amber-600 text-white shadow-lg"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <DollarSign className="h-4 w-4" />
-            Sell
-          </button>
-        </div>
-
-        {/* Search Bar */}
-        <form onSubmit={handleSubmit} className="mx-auto max-w-2xl">
-          <div
-            className={`group relative flex items-center rounded-2xl border bg-slate-800/60 shadow-2xl shadow-black/20 backdrop-blur-xl transition-all ${
-              mode === "sell"
-                ? "border-slate-700/50 focus-within:border-amber-500/50 focus-within:shadow-amber-500/10"
-                : "border-slate-700/50 focus-within:border-emerald-500/50 focus-within:shadow-emerald-500/10"
-            }`}
-          >
-            <Search
-              className={`ml-5 h-5 w-5 shrink-0 text-slate-500 transition-colors ${
-                mode === "sell"
-                  ? "group-focus-within:text-amber-400"
-                  : "group-focus-within:text-emerald-400"
+          <div className="flex items-center gap-px">
+            <button
+              onClick={() => onModeChange("buy")}
+              className={`px-3 py-1 text-xs font-bold tracking-wide transition-colors ${
+                mode === "buy"
+                  ? "bg-[#39ff14] text-black"
+                  : "bg-[#1a1714] text-[#6b6560] hover:text-[#e8e6e3]"
               }`}
-            />
+            >
+              BUY
+            </button>
+            <button
+              onClick={() => onModeChange("sell")}
+              className={`px-3 py-1 text-xs font-bold tracking-wide transition-colors ${
+                mode === "sell"
+                  ? "bg-[#39ff14] text-black"
+                  : "bg-[#1a1714] text-[#6b6560] hover:text-[#e8e6e3]"
+              }`}
+            >
+              SELL
+            </button>
+          </div>
+        </div>
+
+        {/* Command-line search bar */}
+        <form onSubmit={handleSubmit}>
+          <div className="flex items-center border border-[#2a2520] bg-[#0d0b09]">
+            <span className="px-3 text-xs text-[#39ff14]">
+              {mode === "buy" ? "FIND>" : "SELL>"}
+            </span>
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={
                 mode === "buy"
-                  ? "What are you looking to buy?"
-                  : "What are you selling?"
+                  ? "Enter product to scan..."
+                  : "Enter product to price..."
               }
-              className="h-14 flex-1 bg-transparent px-4 text-white placeholder-slate-500 outline-none sm:h-16 sm:text-lg"
+              className="h-9 flex-1 bg-transparent text-sm text-[#e8e6e3] placeholder-[#6b6560] outline-none"
               disabled={isLoading}
             />
-            <div className="pr-2">
-              <Button
-                type="submit"
-                disabled={!query.trim() || isLoading}
-                className={`h-10 rounded-xl px-6 font-semibold text-white disabled:opacity-40 sm:h-12 sm:px-8 ${
-                  mode === "sell"
-                    ? "bg-amber-600 hover:bg-amber-500"
-                    : "bg-emerald-600 hover:bg-emerald-500"
-                }`}
-              >
-                {isLoading ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : mode === "buy" ? (
-                  "Find Deals"
-                ) : (
-                  "Price It"
-                )}
-              </Button>
-            </div>
+            <button
+              type="submit"
+              disabled={!query.trim() || isLoading}
+              className="flex h-9 items-center gap-1.5 bg-[#39ff14] px-4 text-xs font-bold text-black transition-colors hover:bg-[#32cd32] disabled:opacity-30"
+            >
+              {isLoading ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                "GO"
+              )}
+            </button>
           </div>
         </form>
 
-        {/* Quick suggestions */}
-        <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-          <span className="text-xs text-slate-600">Try:</span>
+        {/* Quick tickers */}
+        <div className="mt-2 flex flex-wrap items-center gap-1">
           {suggestions.map((s) => (
             <button
               key={s}
@@ -161,13 +124,9 @@ export default function SearchHeader({
                 onSearch(s);
               }}
               disabled={isLoading}
-              className={`rounded-full border bg-slate-800/40 px-3 py-1 text-xs text-slate-400 transition-all disabled:opacity-40 ${
-                mode === "sell"
-                  ? "border-slate-700/50 hover:border-amber-500/30 hover:text-amber-400"
-                  : "border-slate-700/50 hover:border-emerald-500/30 hover:text-emerald-400"
-              }`}
+              className="border border-[#2a2520] bg-[#0d0b09] px-2 py-0.5 text-[10px] text-[#6b6560] transition-colors hover:border-[#39ff14] hover:text-[#39ff14] disabled:opacity-30"
             >
-              {s}
+              {s.toUpperCase()}
             </button>
           ))}
         </div>
