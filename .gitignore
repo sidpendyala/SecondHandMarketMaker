@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+backend/venv/
+
+# Environment variables
+.env
+backend/.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Next.js
+.next/
+out/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Cache
+backend/cache/product_fields_cache.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# Misc
+*.tsbuildinfo

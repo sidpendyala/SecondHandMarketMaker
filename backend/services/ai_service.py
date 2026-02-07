@@ -1,0 +1,706 @@
+"""
+AI Service - "The Visionary"
+Uses OpenAI GPT-4o with Google Gemini fallback for image condition analysis
+and smart product field generation. Includes a persistent JSON cache for
+product fields so similar queries reuse previously generated fields.
+"""
+
+import json
+import os
+import re
+import pathlib
+import threading
+
+from openai import OpenAI
+
+# Lazy-load Gemini to avoid import errors if not installed
+_gemini = None
+
+
+def _get_gemini():
+    global _gemini
+    if _gemini is None:
+        try:
+            import google.generativeai as genai
+            _gemini = genai
+        except ImportError:
+            _gemini = False  # Mark as unavailable
+    return _gemini if _gemini else None
+
+
+# ---------------------------------------------------------------------------
+# Prompts
+# ---------------------------------------------------------------------------
+
+CONDITION_PROMPT = """You are an expert second-hand goods appraiser. Analyse the product image and provide:
+
+1. **Overall Condition Rating**: X/10
+2. **Visible Damage**: List any scratches, dents, discoloration, missing parts.
+3. **Cosmetic Notes**: General wear level (Mint / Like New / Good / Fair / Poor).
+4. **Purchase Recommendation**: Brief 1-sentence recommendation for a buyer.
+
+Be concise but thorough. If the image is unclear, note that."""
+
+
+STRUCTURED_CONDITION_PROMPT = """You are a STRICT and CRITICAL second-hand goods appraiser. Your job is to protect buyers from overpaying. Look carefully at the product image and rate its TRUE physical condition.
+
+Return ONLY a JSON object (no markdown, no code fences) with these exact keys:
+
+{
+  "rating": <integer 1-10>,
+  "label": "<one of: Mint, Like New, Good, Fair, Poor>",
+  "notes": "<one concise sentence listing ALL visible defects>"
+}
+
+STRICT rating guide — when in doubt, round DOWN:
+- 10: Factory sealed, brand new in packaging, never opened
+- 9: Opened but pristine, zero wear, indistinguishable from new
+- 7-8: Light cosmetic wear — tiny scuffs or light scratches only, fully functional
+- 5-6: Obvious wear — visible scratches, scuffs, discoloration, dents, but still works
+- 3-4: Damaged — cracked, broken parts, heavy scratches, peeling, missing pieces
+- 1-2: For parts only — shattered screen, snapped headband, non-functional, major breaks
+
+CRITICAL RULES:
+- If you see ANY crack, break, or snapped component → rate 1-3
+- If you see heavy scratches, deep scuffs, or peeling → rate 3-5
+- If the item looks worn but intact → rate 5-7
+- Only rate 8+ if the item looks nearly perfect
+- NEVER rate a visibly damaged item above 5
+- Describe the WORST defect you can see in the notes
+
+Return ONLY valid JSON."""
+
+
+PRODUCT_FIELDS_PROMPT = """You are a second-hand marketplace expert. Given a product name, return ONLY a JSON array (no markdown, no code fences) of 3-5 attributes that BUYERS commonly filter by when shopping for this item.
+
+CRITICAL RULES:
+1. DO NOT include attributes that are already obvious from the product name (e.g. don't list "Processor" for "MacBook Pro M2" — the M2 chip is already specified)
+2. Focus on what DIFFERENTIATES listings and what buyers actually care about
+3. This must work for ANY product category: electronics, clothing, furniture, sports, toys, vehicles, etc.
+4. Keep options BROAD and commonly-used, not hyper-specific
+
+Each element must have:
+{
+  "name": "<Human-readable label>",
+  "key": "<snake_case key>",
+  "type": "<select or boolean>",
+  "options": ["option1", "option2", ...] // empty array for boolean
+}
+
+Category-specific guidance:
+- Electronics: storage, color, connectivity (unlocked/carrier), accessories included
+- Clothing/Shoes: size, color, material
+- Furniture: color/finish, size/dimensions range, material
+- Sports equipment: size, color, skill level
+- Vehicles/parts: year range, mileage range, color
+- General: color, size, completeness (has box/manual/accessories)
+
+ALWAYS include:
+- "Includes Original Box/Packaging" as a boolean (buyers care about this universally)
+
+NEVER include:
+- Brand (already in the product name)
+- Model number (already in the product name)  
+- Processor/chip type if already specified
+- Overly technical specs that most buyers don't filter by
+
+Return ONLY valid JSON. Product: """
+
+
+# ---------------------------------------------------------------------------
+# API key helpers
+# ---------------------------------------------------------------------------
+
+def _has_openai_key() -> bool:
+    key = os.getenv("OPENAI_API_KEY", "")
+    return bool(key) and key != "your_openai_api_key_here"
+
+
+def _has_gemini_key() -> bool:
+    key = os.getenv("GEMINI_API_KEY", "")
+    return bool(key) and key != "your_gemini_api_key_here"
+
+
+def _get_openai_client() -> OpenAI:
+    return OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+
+def _configure_gemini():
+    genai = _get_gemini()
+    if genai:
+        genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+    return genai
+
+
+# ---------------------------------------------------------------------------
+# JSON parsing helper
+# ---------------------------------------------------------------------------
+
+def _parse_json_response(raw: str):
+    """Strip markdown fences and parse JSON."""
+    text = raw.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+        if text.endswith("```"):
+            text = text[:-3]
+        text = text.strip()
+    return json.loads(text)
+
+
+# ---------------------------------------------------------------------------
+# Product fields cache (dynamic programming)
+# ---------------------------------------------------------------------------
+
+CACHE_DIR = pathlib.Path(__file__).parent.parent / "cache"
+CACHE_FILE = CACHE_DIR / "product_fields_cache.json"
+_cache_lock = threading.Lock()
+
+
+def _load_field_cache() -> dict:
+    """Load the product fields cache from disk."""
+    try:
+        if CACHE_FILE.exists():
+            return json.loads(CACHE_FILE.read_text(encoding="utf-8"))
+    except Exception as exc:
+        print(f"[ai_service] Cache read error: {exc}")
+    return {}
+
+
+def _save_field_cache(cache: dict):
+    """Save the product fields cache to disk."""
+    try:
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        CACHE_FILE.write_text(
+            json.dumps(cache, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+    except Exception as exc:
+        print(f"[ai_service] Cache write error: {exc}")
+
+
+def _normalize_query(query: str) -> str:
+    """Normalize a product query for cache lookup."""
+    q = query.lower().strip()
+    q = re.sub(r"[^a-z0-9\s]", "", q)
+    q = re.sub(r"\s+", " ", q)
+    return q
+
+
+def _find_cached_fields(query: str) -> list[dict] | None:
+    """
+    Look up cached fields using fuzzy matching.
+    Strategy: exact match first, then check if any cached key is a
+    substring of the query or vice versa (handles "iPhone 15 Pro 128GB"
+    matching cached "iPhone 15 Pro").
+    """
+    normalized = _normalize_query(query)
+    with _cache_lock:
+        cache = _load_field_cache()
+
+    # Exact match
+    if normalized in cache:
+        print(f"[ai_service] Cache HIT (exact): '{normalized}'")
+        return cache[normalized]
+
+    # Substring match: cached key is contained in query
+    best_match = None
+    best_len = 0
+    for key, fields in cache.items():
+        if key in normalized and len(key) > best_len:
+            best_match = fields
+            best_len = len(key)
+        elif normalized in key and len(normalized) > best_len:
+            best_match = fields
+            best_len = len(normalized)
+
+    if best_match and best_len >= 6:  # Require at least 6 chars overlap
+        print(f"[ai_service] Cache HIT (fuzzy, {best_len} chars): '{normalized}'")
+        return best_match
+
+    return None
+
+
+def _cache_fields(query: str, fields: list[dict]):
+    """Store generated fields in the cache."""
+    normalized = _normalize_query(query)
+    with _cache_lock:
+        cache = _load_field_cache()
+        cache[normalized] = fields
+        _save_field_cache(cache)
+    print(f"[ai_service] Cached fields for '{normalized}'")
+
+
+# ---------------------------------------------------------------------------
+# Original free-text condition analysis (kept for backward compat)
+# ---------------------------------------------------------------------------
+
+def analyze_condition(image_url: str) -> dict:
+    """
+    Analyse a product image for condition using AI vision.
+    Returns: { "analysis": str, "source": "ai" | "gemini" | "mock" }
+    """
+    # Try OpenAI
+    if _has_openai_key():
+        try:
+            client = _get_openai_client()
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": CONDITION_PROMPT},
+                        {"type": "image_url", "image_url": {"url": image_url, "detail": "auto"}},
+                    ],
+                }],
+                max_tokens=500,
+            )
+            return {"analysis": response.choices[0].message.content, "source": "ai"}
+        except Exception as exc:
+            print(f"[ai_service] OpenAI error: {exc}")
+
+    return _mock_analysis(image_url)
+
+
+# ---------------------------------------------------------------------------
+# Structured condition analysis with fallback chain
+# ---------------------------------------------------------------------------
+
+def _openai_structured_condition(image_content: list) -> dict | None:
+    """Try OpenAI GPT-4o for structured condition analysis."""
+    if not _has_openai_key():
+        return None
+    try:
+        client = _get_openai_client()
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": image_content}],
+            max_tokens=300,
+        )
+        raw = response.choices[0].message.content
+        print(f"[ai_service] OpenAI raw response: {raw}")
+        data = _parse_json_response(raw)
+        result = {
+            "rating": int(data.get("rating", 5)),
+            "label": str(data.get("label", "Good")),
+            "notes": str(data.get("notes", "")),
+            "source": "ai",
+        }
+        print(f"[ai_service] OpenAI condition result: {result}")
+        return result
+    except Exception as exc:
+        print(f"[ai_service] OpenAI structured error: {exc}")
+        return None
+
+
+def _gemini_structured_condition_base64(base64_data: str) -> dict | None:
+    """Try Google Gemini for structured condition analysis from base64 image."""
+    if not _has_gemini_key():
+        return None
+    genai = _configure_gemini()
+    if not genai:
+        return None
+
+    try:
+        # Extract mime type and raw base64 from data URL
+        # Format: "data:image/jpeg;base64,/9j/4AAQ..."
+        if base64_data.startswith("data:"):
+            header, b64_str = base64_data.split(",", 1)
+            mime_type = header.split(":")[1].split(";")[0]
+        else:
+            b64_str = base64_data
+            mime_type = "image/jpeg"
+
+        import base64
+        image_bytes = base64.b64decode(b64_str)
+
+        model = genai.GenerativeModel("gemini-2.0-flash")
+        response = model.generate_content(
+            [
+                STRUCTURED_CONDITION_PROMPT,
+                {"mime_type": mime_type, "data": image_bytes},
+            ],
+            generation_config=genai.GenerationConfig(max_output_tokens=300),
+        )
+
+        raw = response.text
+        print(f"[ai_service] Gemini base64 raw response: {raw}")
+        data = _parse_json_response(raw)
+        result = {
+            "rating": int(data.get("rating", 5)),
+            "label": str(data.get("label", "Good")),
+            "notes": str(data.get("notes", "")),
+            "source": "gemini",
+        }
+        print(f"[ai_service] Gemini base64 condition result: {result}")
+        return result
+    except Exception as exc:
+        print(f"[ai_service] Gemini structured error: {exc}")
+        return None
+
+
+def _gemini_structured_condition_url(image_url: str) -> dict | None:
+    """Try Google Gemini for structured condition analysis from URL."""
+    if not _has_gemini_key():
+        return None
+    genai = _configure_gemini()
+    if not genai:
+        return None
+
+    try:
+        # Gemini can't directly access URLs, so download the image first
+        import requests as _requests
+        resp = _requests.get(image_url, timeout=10)
+        resp.raise_for_status()
+        image_bytes = resp.content
+        content_type = resp.headers.get("Content-Type", "image/jpeg")
+
+        model = genai.GenerativeModel("gemini-2.0-flash")
+        response = model.generate_content(
+            [
+                STRUCTURED_CONDITION_PROMPT,
+                {"mime_type": content_type, "data": image_bytes},
+            ],
+            generation_config=genai.GenerationConfig(max_output_tokens=300),
+        )
+
+        raw = response.text
+        print(f"[ai_service] Gemini URL raw response: {raw}")
+        data = _parse_json_response(raw)
+        result = {
+            "rating": int(data.get("rating", 5)),
+            "label": str(data.get("label", "Good")),
+            "notes": str(data.get("notes", "")),
+            "source": "gemini",
+        }
+        print(f"[ai_service] Gemini URL condition result: {result}")
+        return result
+    except Exception as exc:
+        print(f"[ai_service] Gemini URL condition error: {exc}")
+        return None
+
+
+def analyze_condition_structured(image_url: str) -> dict:
+    """
+    Analyse a product image and return structured condition data.
+    Fallback chain: OpenAI -> Gemini -> Mock
+    """
+    print(f"[ai_service] Analyzing URL image for condition: {image_url[:80]}...")
+    # Try OpenAI — use detail: "auto" for URL images
+    content = [
+        {"type": "text", "text": STRUCTURED_CONDITION_PROMPT},
+        {"type": "image_url", "image_url": {"url": image_url, "detail": "auto"}},
+    ]
+    result = _openai_structured_condition(content)
+    if result:
+        return result
+
+    # Try Gemini
+    result = _gemini_structured_condition_url(image_url)
+    if result:
+        return result
+
+    return _mock_structured()
+
+
+def analyze_condition_from_base64(base64_data: str) -> dict:
+    """
+    Analyse a product image from base64 data.
+    Fallback chain: OpenAI -> Gemini -> Mock
+    """
+    print("[ai_service] Analyzing uploaded image for condition...")
+    # Try OpenAI — use detail: "high" so damage is visible
+    content = [
+        {"type": "text", "text": STRUCTURED_CONDITION_PROMPT},
+        {"type": "image_url", "image_url": {"url": base64_data, "detail": "high"}},
+    ]
+    result = _openai_structured_condition(content)
+    if result:
+        return result
+
+    # Try Gemini
+    result = _gemini_structured_condition_base64(base64_data)
+    if result:
+        return result
+
+    return _mock_structured()
+
+
+# ---------------------------------------------------------------------------
+# Combined: product detection + condition from uploaded image
+# ---------------------------------------------------------------------------
+
+DETECT_AND_ANALYZE_PROMPT = """You are an expert product appraiser. Look at this product image and return ONLY a JSON object (no markdown, no code fences) with these exact keys:
+
+{
+  "condition": {
+    "rating": <integer 1-10>,
+    "label": "<Mint | Like New | Good | Fair | Poor>",
+    "notes": "<one sentence listing ALL visible defects>"
+  },
+  "detected_product": "<what this product is, e.g. 'Sony WH-1000XM4 Wireless Headphones'>",
+  "detected_attributes": {
+    "<attribute_key>": "<detected_value>"
+  }
+}
+
+For condition, be STRICT — round DOWN when in doubt:
+- 10: Factory sealed, brand new in packaging
+- 9: Opened but pristine, zero wear
+- 7-8: Light cosmetic wear, fully functional
+- 5-6: Obvious scratches, scuffs, dents, but works
+- 3-4: Cracked, broken parts, heavy damage
+- 1-2: For parts only, major breaks, non-functional
+- NEVER rate a visibly damaged item above 5
+
+For detected_attributes, identify ONLY what you can visually confirm:
+- "color": the color you see
+- "storage" / "size": if visible on the device or label
+- "has_box": "Yes" if original packaging is visible, "No" otherwise
+- "has_accessories": "Yes" if cables/chargers/extras are visible
+- Any other clearly visible attributes (screen size text, model markings, etc.)
+
+Only include attributes you can ACTUALLY SEE. Do not guess.
+
+Return ONLY valid JSON."""
+
+
+def _gemini_detect_and_analyze(base64_data: str) -> dict | None:
+    """Use Gemini to detect product + analyze condition from base64 image."""
+    if not _has_gemini_key():
+        return None
+    genai = _configure_gemini()
+    if not genai:
+        return None
+
+    try:
+        if base64_data.startswith("data:"):
+            header, b64_str = base64_data.split(",", 1)
+            mime_type = header.split(":")[1].split(";")[0]
+        else:
+            b64_str = base64_data
+            mime_type = "image/jpeg"
+
+        import base64
+        image_bytes = base64.b64decode(b64_str)
+
+        model = genai.GenerativeModel("gemini-2.0-flash")
+        response = model.generate_content(
+            [
+                DETECT_AND_ANALYZE_PROMPT,
+                {"mime_type": mime_type, "data": image_bytes},
+            ],
+            generation_config=genai.GenerationConfig(max_output_tokens=500),
+        )
+
+        raw = response.text
+        print(f"[ai_service] Gemini detect+analyze raw: {raw}")
+        data = _parse_json_response(raw)
+
+        cond = data.get("condition", {})
+        result = {
+            "rating": int(cond.get("rating", 5)),
+            "label": str(cond.get("label", "Good")),
+            "notes": str(cond.get("notes", "")),
+            "source": "gemini",
+            "detected_product": str(data.get("detected_product", "")),
+            "detected_attributes": data.get("detected_attributes", {}),
+        }
+        print(f"[ai_service] Gemini detect+analyze result: {result}")
+        return result
+    except Exception as exc:
+        print(f"[ai_service] Gemini detect+analyze error: {exc}")
+        return None
+
+
+def _openai_detect_and_analyze(base64_data: str) -> dict | None:
+    """Use OpenAI to detect product + analyze condition from base64 image."""
+    if not _has_openai_key():
+        return None
+    try:
+        client = _get_openai_client()
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": DETECT_AND_ANALYZE_PROMPT},
+                    {"type": "image_url", "image_url": {"url": base64_data, "detail": "high"}},
+                ],
+            }],
+            max_tokens=500,
+        )
+        raw = response.choices[0].message.content
+        print(f"[ai_service] OpenAI detect+analyze raw: {raw}")
+        data = _parse_json_response(raw)
+
+        cond = data.get("condition", {})
+        result = {
+            "rating": int(cond.get("rating", 5)),
+            "label": str(cond.get("label", "Good")),
+            "notes": str(cond.get("notes", "")),
+            "source": "ai",
+            "detected_product": str(data.get("detected_product", "")),
+            "detected_attributes": data.get("detected_attributes", {}),
+        }
+        print(f"[ai_service] OpenAI detect+analyze result: {result}")
+        return result
+    except Exception as exc:
+        print(f"[ai_service] OpenAI detect+analyze error: {exc}")
+        return None
+
+
+def detect_and_analyze_image(base64_data: str) -> dict:
+    """
+    Combined: detect product identity + analyze condition from uploaded image.
+    Fallback chain: OpenAI -> Gemini -> Mock
+    Returns { rating, label, notes, source, detected_product, detected_attributes }
+    """
+    print("[ai_service] Running combined detect + analyze...")
+
+    # Try OpenAI
+    result = _openai_detect_and_analyze(base64_data)
+    if result:
+        return result
+
+    # Try Gemini
+    result = _gemini_detect_and_analyze(base64_data)
+    if result:
+        return result
+
+    # Mock fallback
+    mock = _mock_structured()
+    mock["detected_product"] = ""
+    mock["detected_attributes"] = {}
+    return mock
+
+
+# ---------------------------------------------------------------------------
+# Smart product fields generation with caching
+# ---------------------------------------------------------------------------
+
+def _openai_generate_fields(product_name: str) -> list[dict] | None:
+    """Try OpenAI to generate product fields."""
+    if not _has_openai_key():
+        return None
+    try:
+        client = _get_openai_client()
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": PRODUCT_FIELDS_PROMPT + product_name}],
+            max_tokens=500,
+        )
+        fields = _parse_json_response(response.choices[0].message.content)
+        if not isinstance(fields, list):
+            return None
+        validated = []
+        for f in fields[:6]:
+            validated.append({
+                "name": str(f.get("name", "")),
+                "key": str(f.get("key", "")),
+                "type": str(f.get("type", "select")),
+                "options": list(f.get("options", [])),
+            })
+        return validated
+    except Exception as exc:
+        print(f"[ai_service] OpenAI fields error: {exc}")
+        return None
+
+
+def _gemini_generate_fields(product_name: str) -> list[dict] | None:
+    """Try Google Gemini to generate product fields."""
+    if not _has_gemini_key():
+        return None
+    genai = _configure_gemini()
+    if not genai:
+        return None
+
+    try:
+        model = genai.GenerativeModel("gemini-2.0-flash")
+        response = model.generate_content(
+            PRODUCT_FIELDS_PROMPT + product_name,
+            generation_config=genai.GenerationConfig(max_output_tokens=500),
+        )
+        fields = _parse_json_response(response.text)
+        if not isinstance(fields, list):
+            return None
+        validated = []
+        for f in fields[:6]:
+            validated.append({
+                "name": str(f.get("name", "")),
+                "key": str(f.get("key", "")),
+                "type": str(f.get("type", "select")),
+                "options": list(f.get("options", [])),
+            })
+        return validated
+    except Exception as exc:
+        print(f"[ai_service] Gemini fields error: {exc}")
+        return None
+
+
+def generate_product_fields(product_name: str) -> list[dict]:
+    """
+    Generate product attribute fields.
+    Strategy: Cache -> OpenAI -> Gemini -> Mock
+    Results are cached so similar future queries return instantly.
+    """
+    # 1. Check cache first (dynamic programming)
+    cached = _find_cached_fields(product_name)
+    if cached:
+        return cached
+
+    # 2. Try OpenAI
+    fields = _openai_generate_fields(product_name)
+    if fields:
+        _cache_fields(product_name, fields)
+        return fields
+
+    # 3. Try Gemini
+    fields = _gemini_generate_fields(product_name)
+    if fields:
+        _cache_fields(product_name, fields)
+        return fields
+
+    # 4. Fall back to mock (also cache it so we don't retry)
+    mock = _mock_product_fields(product_name)
+    _cache_fields(product_name, mock)
+    return mock
+
+
+# ---------------------------------------------------------------------------
+# Mock helpers
+# ---------------------------------------------------------------------------
+
+def _mock_analysis(image_url: str) -> dict:
+    """Return a realistic mock condition analysis."""
+    return {
+        "analysis": (
+            "**Overall Condition Rating**: 7/10\n\n"
+            "**Visible Damage**: Minor scuffing on the headband. "
+            "Small scratch near the left hinge. Ear cushions show light wear.\n\n"
+            "**Cosmetic Notes**: Good condition overall. Signs of regular use "
+            "but no structural damage. All buttons and ports appear functional.\n\n"
+            "**Purchase Recommendation**: A solid buy if priced 20%+ below retail. "
+            "The cosmetic wear is typical and does not affect functionality."
+        ),
+        "source": "mock",
+    }
+
+
+def _mock_structured() -> dict:
+    """Return a mock structured condition result."""
+    return {
+        "rating": 7,
+        "label": "Good",
+        "notes": "Mock analysis – add a GEMINI_API_KEY (free) or OpenAI credits for real AI condition checks.",
+        "source": "mock",
+    }
+
+
+def _mock_product_fields(product_name: str) -> list[dict]:
+    """Return generic mock product fields."""
+    return [
+        {"name": "Color", "key": "color", "type": "select",
+         "options": ["Black", "White", "Silver", "Blue", "Red", "Other"]},
+        {"name": "Includes Original Packaging", "key": "has_box", "type": "boolean", "options": []},
+        {"name": "All Accessories Included", "key": "has_accessories", "type": "boolean", "options": []},
+    ]
