@@ -156,11 +156,3 @@ SecondHandMarketMaker/
 | POST | `/api/verify-condition` | Condition check from image URL |
 
 Full interactive docs: **http://localhost:8000/docs** (when the backend is running).
-
----
-
-## Deployment
-
-Backend (Render or Railway) + frontend (Vercel), env vars, and CORS are covered in **[DEPLOY.md](./DEPLOY.md)**.
-
----
