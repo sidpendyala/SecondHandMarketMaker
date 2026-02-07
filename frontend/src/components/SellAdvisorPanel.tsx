@@ -63,20 +63,21 @@ export default function SellAdvisorPanel({
           [{data.confidence.toUpperCase()}]
         </span>
         <span className="text-xs text-[#6b6560]">
-          {data.query.toUpperCase()} &middot; {data.sample_size} SALES
+          {data.query.toUpperCase()}
+          {priceRefreshing ? " · — SALES" : ` · ${data.sample_size} SALES`}
         </span>
       </div>
 
-      {/* Market summary ticker */}
+      {/* Market summary ticker — placeholders when recalculating to avoid showing stale prices */}
       <div className="mb-3 grid grid-cols-3 gap-px bg-[#2a2520]">
         {[
-          { label: "FAIR VALUE", value: `$${data.fair_value.toFixed(2)}`, color: "text-[#39ff14]" },
-          { label: "AVG SOLD", value: `$${data.mean_price.toFixed(2)}`, color: "text-[#e8e6e3]" },
-          { label: "RANGE", value: `$${data.min_price.toFixed(0)}-$${data.max_price.toFixed(0)}`, color: "text-[#e8e6e3]" },
+          { label: "FAIR VALUE", value: priceRefreshing ? "—" : `$${data.fair_value.toFixed(2)}`, color: "text-[#39ff14]" },
+          { label: "AVG SOLD", value: priceRefreshing ? "—" : `$${data.mean_price.toFixed(2)}`, color: "text-[#e8e6e3]" },
+          { label: "RANGE", value: priceRefreshing ? "—" : `$${data.min_price.toFixed(0)}-$${data.max_price.toFixed(0)}`, color: "text-[#e8e6e3]" },
         ].map((s) => (
           <div key={s.label} className="bg-black px-3 py-2">
             <div className="text-[10px] text-[#6b6560]">{s.label}</div>
-            <div className={`text-lg font-bold ${s.color}`}>{s.value}</div>
+            <div className={`text-lg font-bold ${s.color} ${priceRefreshing ? "tabular-nums" : ""}`}>{s.value}</div>
           </div>
         ))}
       </div>
@@ -128,7 +129,7 @@ export default function SellAdvisorPanel({
         </div>
       )}
 
-      {/* Pricing Tiers */}
+      {/* Pricing Tiers — show placeholders when recalculating so we never show stale/wrong prices */}
       {hasUserInput && (
         <>
           <div className="mb-2 border-b border-[#2a2520] pb-1">
@@ -136,13 +137,9 @@ export default function SellAdvisorPanel({
               PRICING TIERS
             </span>
           </div>
-          <div
-            className={`grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 transition-opacity duration-200 ${
-              priceRefreshing ? "opacity-40" : "opacity-100"
-            }`}
-          >
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {data.tiers.map((tier) => {
-              const isRec = tier.name === recommendedTier;
+              const isRec = tier.name === recommendedTier && !priceRefreshing;
               return (
                 <div
                   key={tier.name}
@@ -160,29 +157,29 @@ export default function SellAdvisorPanel({
                     )}
                   </div>
 
-                  {/* List price */}
-                  <div className={`text-xl font-bold ${isRec ? "text-[#39ff14]" : "text-[#e8e6e3]"}`}>
-                    ${tier.list_price.toFixed(2)}
+                  {/* List price — placeholder when refreshing */}
+                  <div className={`text-xl font-bold tabular-nums ${isRec ? "text-[#39ff14]" : "text-[#e8e6e3]"}`}>
+                    {priceRefreshing ? "—" : `$${tier.list_price.toFixed(2)}`}
                   </div>
 
-                  {/* Fees */}
+                  {/* Fees — placeholders when refreshing */}
                   <div className="mt-2 space-y-0.5 border-t border-[#2a2520] pt-2 text-[10px]">
                     <div className="flex justify-between">
                       <span className="text-[#6b6560]">EBAY FEE</span>
-                      <span className="text-[#ff3333]">
-                        -${tier.ebay_fee.toFixed(2)}
+                      <span className="text-[#ff3333] tabular-nums">
+                        {priceRefreshing ? "—" : `-$${tier.ebay_fee.toFixed(2)}`}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-[#6b6560]">SHIPPING</span>
-                      <span className="text-[#ff3333]">
-                        -${tier.shipping.toFixed(2)}
+                      <span className="text-[#ff3333] tabular-nums">
+                        {priceRefreshing ? "—" : `-$${tier.shipping.toFixed(2)}`}
                       </span>
                     </div>
                     <div className="flex justify-between border-t border-[#2a2520] pt-1 text-xs">
                       <span className="font-bold text-[#6b6560]">NET</span>
-                      <span className="font-bold text-[#33cc33]">
-                        ${tier.net_payout.toFixed(2)}
+                      <span className="font-bold text-[#33cc33] tabular-nums">
+                        {priceRefreshing ? "—" : `$${tier.net_payout.toFixed(2)}`}
                       </span>
                     </div>
                   </div>

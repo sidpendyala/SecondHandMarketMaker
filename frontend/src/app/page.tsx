@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import { flushSync } from "react-dom";
 import {
   Frown,
   DollarSign,
@@ -243,23 +244,36 @@ export default function Home() {
   }, []);
 
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refreshGeneration = useRef(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const refreshSellAdvisor = useCallback(
     (condition?: number, details?: Record<string, string>) => {
       const query = currentSellQuery.current;
       if (!query) return;
 
-      setPriceRefreshing(true);
+      // Show placeholders immediately (before any condition/details update) so we never paint wrong prices
+      flushSync(() => setPriceRefreshing(true));
 
       if (refreshTimer.current) clearTimeout(refreshTimer.current);
+      abortControllerRef.current?.abort();
+      const generation = ++refreshGeneration.current;
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
       refreshTimer.current = setTimeout(async () => {
         try {
-          const result = await sellAdvisor(query, condition, details);
+          const result = await sellAdvisor(query, condition, details, controller.signal);
+          if (generation !== refreshGeneration.current) return;
           setSellData(result);
-        } catch {
-          // silent
+        } catch (e) {
+          if (generation !== refreshGeneration.current) return;
+          if ((e as Error)?.name === "AbortError") return;
+          // silent for other errors
         } finally {
-          setPriceRefreshing(false);
+          if (generation === refreshGeneration.current) {
+            setPriceRefreshing(false);
+          }
         }
       }, 800);
     },
@@ -269,14 +283,16 @@ export default function Home() {
   useEffect(() => {
     return () => {
       if (refreshTimer.current) clearTimeout(refreshTimer.current);
+      abortControllerRef.current?.abort();
     };
   }, []);
 
   const handleSellCondition = useCallback(
     (result: ConditionResult) => {
+      // Refresh first so placeholders show before we render new condition (avoids wrong-then-right flash)
+      refreshSellAdvisor(result.rating, sellDetails);
       setSellCondition(result.rating);
       setConditionResult(result);
-      refreshSellAdvisor(result.rating, sellDetails);
 
       if (
         result.detected_attributes &&
@@ -290,8 +306,9 @@ export default function Home() {
 
   const handleFieldsChange = useCallback(
     (values: Record<string, string>) => {
-      setSellDetails(values);
+      // Refresh first so placeholders show before we render new details (avoids wrong-then-right flash)
       refreshSellAdvisor(sellCondition, values);
+      setSellDetails(values);
     },
     [sellCondition, refreshSellAdvisor]
   );

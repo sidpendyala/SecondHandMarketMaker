@@ -156,6 +156,29 @@ def _condition_multiplier(rating: int | None) -> float:
     return 0.20            # Parts only / non-functional
 
 
+# Sold-listings title phrases that mean "not the full product" — exclude from tier percentiles
+SOLD_EXCLUDE_PHRASES = (
+    "box only", "empty box", "case only", "manual only",
+    "for parts", "parts only", "not working", "does not work", "doesnt work",
+)
+
+# Minimum list price as fraction of median (avoids suggesting $4 for a $20-fair-value item)
+MIN_TIER_FRACTION_OF_MEDIAN = 0.35
+
+
+def _filter_sold_for_tiers(sold_items: list[dict]) -> list[dict]:
+    """Exclude sold listings that are clearly not the full product (case only, parts, etc.)."""
+    if not sold_items:
+        return sold_items
+    kept = []
+    for item in sold_items:
+        title = (item.get("title") or "").lower()
+        if any(phrase in title for phrase in SOLD_EXCLUDE_PHRASES):
+            continue
+        kept.append(item)
+    return kept if len(kept) >= 3 else sold_items  # keep original if we'd drop too many
+
+
 def calculate_sell_tiers(
     sold_items: list[dict],
     condition_rating: int | None = None,
@@ -163,18 +186,22 @@ def calculate_sell_tiers(
     """
     Calculate 4 sell-pricing tiers based on sold-item percentiles,
     adjusted for condition rating if provided.
+    Excludes accessory-only/parts listings from the distribution and enforces a minimum list price.
 
     Returns a list of dicts, each with:
       name, list_price, ebay_fee, shipping, net_payout
     """
-    prices = _extract_prices(sold_items)
+    filtered = _filter_sold_for_tiers(sold_items)
+    prices = _extract_prices(filtered)
     prices = _remove_outliers(prices) if len(prices) >= 5 else prices
 
     if not prices:
         return []
 
     sorted_prices = sorted(prices)
+    median_price = statistics.median(sorted_prices)
     multiplier = _condition_multiplier(condition_rating)
+    floor = round(MIN_TIER_FRACTION_OF_MEDIAN * median_price, 2)
 
     tiers_def = [
         ("Quick Sale",    15),
@@ -187,6 +214,7 @@ def calculate_sell_tiers(
     for name, pct in tiers_def:
         raw_price = _percentile(sorted_prices, pct)
         list_price = round(raw_price * multiplier, 2)
+        list_price = max(list_price, floor)  # never suggest below floor (e.g. 35% of median)
         ebay_fee = round(list_price * EBAY_FEE_RATE + EBAY_FEE_FIXED, 2)
         net_payout = round(list_price - ebay_fee - ESTIMATED_SHIPPING, 2)
         tiers.append({

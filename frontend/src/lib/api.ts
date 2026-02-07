@@ -23,12 +23,14 @@ export async function analyzeProduct(query: string): Promise<AnalyzeResponse> {
 export async function sellAdvisor(
   query: string,
   condition?: number,
-  details?: Record<string, string>
+  details?: Record<string, string>,
+  signal?: AbortSignal
 ): Promise<SellAdvisorResponse> {
   const res = await fetch(`${API_BASE}/api/sell-advisor`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ query, condition, details }),
+    signal,
   });
   if (!res.ok) {
     const err = await res
