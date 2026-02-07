@@ -9,7 +9,7 @@ const ibmPlexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MarketMaker — Bloomberg-Style Deal Terminal",
+  title: "Second Hand MarketMaker",
   description:
     "AI-powered deal intelligence for second-hand goods. Find underpriced listings and arbitrage opportunities.",
 };

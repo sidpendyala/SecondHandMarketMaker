@@ -209,18 +209,6 @@ export default function Home() {
     [executeSearch]
   );
 
-  /**
-   * Called when user clicks SKIP in the refinement UI.
-   */
-  const handleRefinementSkip = useCallback(() => {
-    const baseQuery = pendingQueryRef.current;
-    const keepImage = keepImageRef.current;
-
-    setRefinementSelections({});
-    setRefinementFields([]);
-    executeSearch(baseQuery, keepImage);
-  }, [executeSearch]);
-
   const handleModeChange = useCallback((newMode: Mode) => {
     setMode(newMode);
     setBuyData(null);
@@ -233,6 +221,26 @@ export default function Home() {
     setRefinementSelections({});
     setImagePreview(null);
     setConditionResult(null);
+  }, []);
+
+  /** Home: reset everything to default state */
+  const handleHomeClick = useCallback(() => {
+    setMode("buy");
+    setBuyData(null);
+    setSellData(null);
+    setError(null);
+    setSearchBarQuery(undefined);
+    setRefinementFields([]);
+    setRefinementSelections({});
+    setProductFields([]);
+    setSellCondition(undefined);
+    setSellDetails({});
+    setDetectedAttrs({});
+    setImagePreview(null);
+    setConditionResult(null);
+    setShowResults(false);
+    setShowFiltered(false);
+    setIsLoading(false);
   }, []);
 
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -312,6 +320,7 @@ export default function Home() {
         mode={mode}
         onModeChange={handleModeChange}
         externalQuery={searchBarQuery}
+        onHomeClick={handleHomeClick}
       />
 
       {/* Main */}
@@ -322,7 +331,6 @@ export default function Home() {
           onComplete={() => setShowResults(true)}
           refinementFields={refinementFields}
           onRefinementSubmit={handleRefinementSubmit}
-          onRefinementSkip={handleRefinementSkip}
         />
 
         {/* Error */}

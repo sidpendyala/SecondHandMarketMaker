@@ -11,6 +11,8 @@ interface SearchHeaderProps {
   mode: Mode;
   onModeChange: (mode: Mode) => void;
   externalQuery?: string;
+  /** Called when the logo/title is clicked — reset to home/default state */
+  onHomeClick?: () => void;
 }
 
 export default function SearchHeader({
@@ -19,11 +21,14 @@ export default function SearchHeader({
   mode,
   onModeChange,
   externalQuery,
+  onHomeClick,
 }: SearchHeaderProps) {
   const [query, setQuery] = useState("");
 
   useEffect(() => {
-    if (externalQuery !== undefined && externalQuery !== query) {
+    if (externalQuery === undefined) {
+      setQuery("");
+    } else if (externalQuery !== query) {
       setQuery(externalQuery);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -47,15 +52,19 @@ export default function SearchHeader({
   return (
     <div className="border-b border-[#2a2520] bg-black px-4 py-3">
       <div className="mx-auto max-w-6xl">
-        {/* Top row: brand + mode tabs */}
+        {/* Top row: brand (home) + mode tabs */}
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="text-sm font-bold text-[#39ff14]">
-              MARKETMAKER
-            </span>
-            <span className="text-xs text-[#6b6560]">
-              AI DEAL INTELLIGENCE
-            </span>
+            <button
+              type="button"
+              onClick={onHomeClick}
+              className="flex items-center gap-3 text-left transition-opacity hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-[#39ff14]/50 focus:ring-offset-0"
+              aria-label="Go to home"
+            >
+              <span className="text-sm font-bold text-[#39ff14]">
+                SECOND HAND MARKETMAKER
+              </span>
+            </button>
           </div>
 
           <div className="flex items-center gap-px">

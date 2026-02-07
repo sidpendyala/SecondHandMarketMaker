@@ -50,8 +50,6 @@ interface ProgressLoaderProps {
   refinementFields?: ProductField[];
   /** Called when user submits refinement selections */
   onRefinementSubmit?: (values: Record<string, string>) => void;
-  /** Called when user skips refinement */
-  onRefinementSkip?: () => void;
 }
 
 export default function ProgressLoader({
@@ -60,7 +58,6 @@ export default function ProgressLoader({
   onComplete,
   refinementFields,
   onRefinementSubmit,
-  onRefinementSkip,
 }: ProgressLoaderProps) {
   const [progress, setProgress] = useState(0);
   const [visible, setVisible] = useState(false);
@@ -200,10 +197,6 @@ export default function ProgressLoader({
     onRefinementSubmit?.(selected);
   };
 
-  const handleSkip = () => {
-    onRefinementSkip?.();
-  };
-
   return (
     <div className="mx-auto max-w-xl px-4 py-12">
       <div className="border border-[#2a2520] bg-[#0d0b09] p-5">
@@ -286,19 +279,13 @@ export default function ProgressLoader({
               ))}
             </div>
 
-            {/* Buttons */}
-            <div className="mt-4 flex gap-2">
+            {/* Continue only */}
+            <div className="mt-4">
               <button
                 onClick={handleContinue}
-                className="flex-1 border border-[#39ff14] bg-[#39ff14]/10 px-4 py-2 text-xs font-bold text-[#39ff14] transition-colors hover:bg-[#39ff14]/20"
+                className="w-full border border-[#39ff14] bg-[#39ff14]/10 px-4 py-2 text-xs font-bold text-[#39ff14] transition-colors hover:bg-[#39ff14]/20"
               >
                 CONTINUE
-              </button>
-              <button
-                onClick={handleSkip}
-                className="border border-[#2a2520] bg-black px-4 py-2 text-xs font-bold text-[#6b6560] transition-colors hover:border-[#6b6560] hover:text-[#e8e6e3]"
-              >
-                SKIP
               </button>
             </div>
           </div>
