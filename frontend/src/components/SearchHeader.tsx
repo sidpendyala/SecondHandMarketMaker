@@ -58,13 +58,16 @@ export default function SearchHeader({
             <button
               type="button"
               onClick={onHomeClick}
-              className="flex items-center gap-3 text-left transition-opacity hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-[#39ff14]/50 focus:ring-offset-0"
+              className="text-left transition-opacity hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-[#39ff14]/50 focus:ring-offset-0"
               aria-label="Go to home"
             >
               <span className="text-sm font-bold text-[#39ff14]">
                 SECOND HAND MARKETMAKER
               </span>
             </button>
+            <span className="text-xs text-[#6b6560]">
+              AI DEAL INTELLIGENCE
+            </span>
           </div>
 
           <div className="flex items-center gap-px">
