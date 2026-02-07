@@ -133,7 +133,7 @@ export default function SmartFieldsForm({
               </label>
 
               {field.type === "boolean" ? (
-                <label className="animated-checkbox flex items-center gap-2 border border-[#2a2520] bg-black px-2.5 py-2 hover:border-[#6b6560]">
+                <label className="flex cursor-pointer items-center gap-2 border border-[#2a2520] bg-black px-2.5 py-2 hover:border-[#6b6560]">
                   <input
                     type="checkbox"
                     checked={values[field.key] === "Yes"}
@@ -144,6 +144,7 @@ export default function SmartFieldsForm({
                       )
                     }
                     aria-label={field.name}
+                    className="h-4 w-4 accent-[#39ff14]"
                   />
                   <span className="text-[11px] text-[#e8e6e3]">
                     {field.name}
