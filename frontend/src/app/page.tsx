@@ -21,6 +21,7 @@ import {
   sellAdvisor,
   uploadImage,
   getProductFields,
+  refineQuery,
 } from "@/lib/api";
 import type {
   AnalyzeResponse,
@@ -58,38 +59,45 @@ export default function Home() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [conditionResult, setConditionResult] =
     useState<ConditionResult | null>(null);
+  // Query refinement state
+  const [refinementFields, setRefinementFields] = useState<ProductField[]>([]);
+  /** Selections from loading-screen refinement (e.g. Year, Chip, Storage); not asked again in sell product details */
+  const [refinementSelections, setRefinementSelections] = useState<
+    Record<string, string>
+  >({});
+  const pendingQueryRef = useRef<string>("");
+  const keepImageRef = useRef(false);
   const currentSellQuery = useRef<string>("");
 
-  const handleSearch = useCallback(
-    async (query: string, keepImage = false) => {
-      setIsLoading(true);
-      setShowResults(false);
-      setError(null);
-      setBuyData(null);
-      setSellData(null);
-      setProductFields([]);
-      setShowFiltered(false);
-
-      if (!keepImage) {
-        setSellCondition(undefined);
-        setSellDetails({});
-        setDetectedAttrs({});
-        setImagePreview(null);
-        setConditionResult(null);
-      }
-
+  /**
+   * Execute the actual data fetch (buy or sell) with the given query.
+   * Called either directly (no refinement needed) or after user completes refinement.
+   * refinementValues: when provided (sell mode), merged into sell details and stored so product-detail form won't ask again.
+   */
+  const executeSearch = useCallback(
+    async (
+      query: string,
+      keepImage: boolean,
+      refinementValues?: Record<string, string>
+    ) => {
       try {
         if (mode === "buy") {
           const result = await analyzeProduct(query);
           setBuyData(result);
         } else {
           currentSellQuery.current = query;
+          const detailsForAdvisor = {
+            ...(refinementValues || {}),
+            ...(keepImage ? sellDetails : {}),
+          };
 
           const [advisorResult, fieldsResult] = await Promise.allSettled([
             sellAdvisor(
               query,
               keepImage ? sellCondition : undefined,
-              keepImage ? sellDetails : undefined
+              Object.keys(detailsForAdvisor).length > 0
+                ? detailsForAdvisor
+                : undefined
             ),
             (async () => {
               setFieldsLoading(true);
@@ -113,6 +121,11 @@ export default function Home() {
           if (fieldsResult.status === "fulfilled") {
             setProductFields(fieldsResult.value.fields);
           }
+
+          if (refinementValues && Object.keys(refinementValues).length > 0) {
+            setRefinementSelections(refinementValues);
+            setSellDetails((prev) => ({ ...refinementValues, ...prev }));
+          }
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong");
@@ -124,6 +137,90 @@ export default function Home() {
     [mode, sellCondition, sellDetails]
   );
 
+  const handleSearch = useCallback(
+    async (query: string, keepImage = false) => {
+      setIsLoading(true);
+      setShowResults(false);
+      setError(null);
+      setBuyData(null);
+      setSellData(null);
+      setProductFields([]);
+      setShowFiltered(false);
+      setRefinementFields([]);
+      setRefinementSelections({});
+
+      if (!keepImage) {
+        setSellCondition(undefined);
+        setSellDetails({});
+        setDetectedAttrs({});
+        setImagePreview(null);
+        setConditionResult(null);
+      }
+
+      // Store for later use by refinement callbacks
+      pendingQueryRef.current = query;
+      keepImageRef.current = keepImage;
+
+      try {
+        // 1. Check if query needs refinement
+        const refinement = await refineQuery(query);
+
+        if (refinement.needs_refinement && refinement.fields.length > 0) {
+          // Pause: show refinement fields in ProgressLoader
+          setRefinementFields(refinement.fields);
+          // isLoading stays true -> loader stays visible but paused
+          return;
+        }
+
+        // 2. No refinement needed -> execute immediately
+        await executeSearch(query, keepImage);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Something went wrong");
+        setShowResults(true);
+        setIsLoading(false);
+      }
+    },
+    [executeSearch]
+  );
+
+  /**
+   * Called when user submits refinement selections from the ProgressLoader.
+   */
+  const handleRefinementSubmit = useCallback(
+    (values: Record<string, string>) => {
+      const baseQuery = pendingQueryRef.current;
+      const keepImage = keepImageRef.current;
+
+      // Build refined query by appending selected values
+      const parts = Object.values(values).filter((v) => v);
+      const refinedQuery = parts.length > 0
+        ? `${baseQuery} ${parts.join(" ")}`
+        : baseQuery;
+
+      // Update search bar to show refined query
+      setSearchBarQuery(refinedQuery);
+
+      // Clear refinement UI and resume loading
+      setRefinementFields([]);
+
+      // Execute the actual search with the refined query; pass values so sell side won't ask again
+      executeSearch(refinedQuery, keepImage, values);
+    },
+    [executeSearch]
+  );
+
+  /**
+   * Called when user clicks SKIP in the refinement UI.
+   */
+  const handleRefinementSkip = useCallback(() => {
+    const baseQuery = pendingQueryRef.current;
+    const keepImage = keepImageRef.current;
+
+    setRefinementSelections({});
+    setRefinementFields([]);
+    executeSearch(baseQuery, keepImage);
+  }, [executeSearch]);
+
   const handleModeChange = useCallback((newMode: Mode) => {
     setMode(newMode);
     setBuyData(null);
@@ -133,6 +230,7 @@ export default function Home() {
     setSellCondition(undefined);
     setSellDetails({});
     setDetectedAttrs({});
+    setRefinementSelections({});
     setImagePreview(null);
     setConditionResult(null);
   }, []);
@@ -222,6 +320,9 @@ export default function Home() {
           isLoading={isLoading}
           mode={mode}
           onComplete={() => setShowResults(true)}
+          refinementFields={refinementFields}
+          onRefinementSubmit={handleRefinementSubmit}
+          onRefinementSkip={handleRefinementSkip}
         />
 
         {/* Error */}
@@ -236,7 +337,7 @@ export default function Home() {
         )}
 
         {/* ==================== BUY MODE ==================== */}
-        {mode === "buy" && buyData && showResults && (
+        {mode === "buy" && buyData && showResults && !isLoading && (
           <>
             <StatsPanel data={buyData} />
 
@@ -368,7 +469,7 @@ export default function Home() {
         )}
 
         {/* ==================== SELL MODE ==================== */}
-        {mode === "sell" && sellData && showResults && (
+        {mode === "sell" && sellData && showResults && !isLoading && (
           <SellAdvisorPanel
             data={sellData}
             productFields={productFields}
@@ -386,6 +487,7 @@ export default function Home() {
             imagePreview={imagePreview}
             conditionResult={conditionResult}
             onImagePreviewChange={setImagePreview}
+            refinementSelections={refinementSelections}
           />
         )}
 

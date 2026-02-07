@@ -87,3 +87,9 @@ export interface ProductFieldsResponse {
   query: string;
   fields: ProductField[];
 }
+
+export interface RefinementResponse {
+  query: string;
+  needs_refinement: boolean;
+  fields: ProductField[];
+}

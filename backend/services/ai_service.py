@@ -107,6 +107,103 @@ NEVER include:
 Return ONLY valid JSON. Product: """
 
 
+QUERY_REFINEMENT_PROMPT = """You are a second-hand marketplace search expert. Given a product search query, determine whether it is too BROAD to return precise results, or already SPECIFIC enough.
+
+A query is BROAD if it lacks key distinguishing attributes. Examples:
+- "macbook air" -> BROAD (missing year, chip, storage)
+- "macbook air m2 256gb 2023" -> SPECIFIC
+- "iphone" -> BROAD (missing model number, storage)
+- "iphone 15 pro 256gb" -> SPECIFIC
+- "nike shoes" -> BROAD (missing model, size)
+- "nike air max 90 size 10" -> SPECIFIC
+- "sony headphones" -> BROAD (missing model)
+- "sony wh-1000xm4" -> SPECIFIC
+- "ps5" -> SPECIFIC (already a precise product)
+- "playstation" -> BROAD (which model?)
+
+If the query is BROAD, return 2-4 key parameters that would narrow it down. Each parameter should have 3-6 options.
+
+Return ONLY a JSON object (no markdown, no code fences):
+{
+  "needs_refinement": true/false,
+  "fields": [
+    {
+      "name": "<Human-readable label>",
+      "key": "<snake_case>",
+      "type": "select",
+      "options": ["opt1", "opt2", ...]
+    }
+  ]
+}
+
+If needs_refinement is false, fields should be an empty array [].
+
+RULES:
+- Only flag as BROAD if adding parameters would genuinely help narrow eBay search results.
+- Do NOT include brand (it's already in the query).
+- Keep it practical: 2-4 fields max, 3-6 options each.
+- For electronics (MacBook, iPhone, iPad, laptops, etc.): prioritize chip/model generation, then storage, then YEAR. For YEAR/release year: ALWAYS list the most RECENT years first. Use the current and previous 4-5 years (e.g. 2025, 2024, 2023, 2022, 2021). Do NOT suggest only old years like 2020 or 2019 unless the product line genuinely has no newer models. For "MacBook Air" the year options should include 2024, 2023, 2022 (M2), and 2020 (M1) — recent first.
+- For clothing: prioritize size, color, style.
+- For vehicles: prioritize year (recent first), mileage, trim.
+- Options must be what buyers actually search for today; prefer current and recent generations over discontinued ones.
+
+Query: """
+
+
+# ---------------------------------------------------------------------------
+# Cache paths (used by refinement and product fields caches)
+# ---------------------------------------------------------------------------
+
+CACHE_DIR = pathlib.Path(__file__).parent.parent / "cache"
+
+
+# ---------------------------------------------------------------------------
+# Query refinement cache
+# ---------------------------------------------------------------------------
+
+REFINEMENT_CACHE_FILE = CACHE_DIR / "query_refinement_cache.json"
+_refinement_cache_lock = threading.Lock()
+
+
+def _load_refinement_cache() -> dict:
+    try:
+        if REFINEMENT_CACHE_FILE.exists():
+            return json.loads(REFINEMENT_CACHE_FILE.read_text(encoding="utf-8"))
+    except Exception as exc:
+        print(f"[ai_service] Refinement cache read error: {exc}")
+    return {}
+
+
+def _save_refinement_cache(cache: dict):
+    try:
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        REFINEMENT_CACHE_FILE.write_text(
+            json.dumps(cache, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+    except Exception as exc:
+        print(f"[ai_service] Refinement cache write error: {exc}")
+
+
+def _find_cached_refinement(query: str) -> dict | None:
+    normalized = _normalize_query(query)
+    with _refinement_cache_lock:
+        cache = _load_refinement_cache()
+    if normalized in cache:
+        print(f"[ai_service] Refinement cache HIT: '{normalized}'")
+        return cache[normalized]
+    return None
+
+
+def _cache_refinement(query: str, result: dict):
+    normalized = _normalize_query(query)
+    with _refinement_cache_lock:
+        cache = _load_refinement_cache()
+        cache[normalized] = result
+        _save_refinement_cache(cache)
+    print(f"[ai_service] Cached refinement for '{normalized}'")
+
+
 # ---------------------------------------------------------------------------
 # API key helpers
 # ---------------------------------------------------------------------------
@@ -151,7 +248,6 @@ def _parse_json_response(raw: str):
 # Product fields cache (dynamic programming)
 # ---------------------------------------------------------------------------
 
-CACHE_DIR = pathlib.Path(__file__).parent.parent / "cache"
 CACHE_FILE = CACHE_DIR / "product_fields_cache.json"
 _cache_lock = threading.Lock()
 
@@ -664,6 +760,94 @@ def generate_product_fields(product_name: str) -> list[dict]:
     mock = _mock_product_fields(product_name)
     _cache_fields(product_name, mock)
     return mock
+
+
+# ---------------------------------------------------------------------------
+# Query refinement (broad query detection)
+# ---------------------------------------------------------------------------
+
+def _validate_refinement(data: dict) -> dict:
+    """Validate and normalize an AI refinement response."""
+    needs = bool(data.get("needs_refinement", False))
+    fields = []
+    if needs:
+        for f in data.get("fields", [])[:4]:
+            fields.append({
+                "name": str(f.get("name", "")),
+                "key": str(f.get("key", "")),
+                "type": "select",
+                "options": [str(o) for o in f.get("options", [])][:6],
+            })
+    return {"needs_refinement": needs and len(fields) > 0, "fields": fields}
+
+
+def _openai_refinement(query: str) -> dict | None:
+    if not _has_openai_key():
+        return None
+    try:
+        client = _get_openai_client()
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": QUERY_REFINEMENT_PROMPT + query}],
+            max_tokens=500,
+        )
+        raw = response.choices[0].message.content
+        print(f"[ai_service] OpenAI refinement raw: {raw}")
+        data = _parse_json_response(raw)
+        return _validate_refinement(data)
+    except Exception as exc:
+        print(f"[ai_service] OpenAI refinement error: {exc}")
+        return None
+
+
+def _gemini_refinement(query: str) -> dict | None:
+    if not _has_gemini_key():
+        return None
+    genai = _configure_gemini()
+    if not genai:
+        return None
+    try:
+        model = genai.GenerativeModel("gemini-2.0-flash")
+        response = model.generate_content(
+            QUERY_REFINEMENT_PROMPT + query,
+            generation_config=genai.GenerationConfig(max_output_tokens=500),
+        )
+        raw = response.text
+        print(f"[ai_service] Gemini refinement raw: {raw}")
+        data = _parse_json_response(raw)
+        return _validate_refinement(data)
+    except Exception as exc:
+        print(f"[ai_service] Gemini refinement error: {exc}")
+        return None
+
+
+def check_query_refinement(query: str) -> dict:
+    """
+    Check if a query is too broad and needs refinement.
+    Strategy: Cache -> OpenAI -> Gemini -> default (no refinement)
+    Returns: { needs_refinement: bool, fields: [...] }
+    """
+    # 1. Cache
+    cached = _find_cached_refinement(query)
+    if cached is not None:
+        return cached
+
+    # 2. OpenAI
+    result = _openai_refinement(query)
+    if result:
+        _cache_refinement(query, result)
+        return result
+
+    # 3. Gemini
+    result = _gemini_refinement(query)
+    if result:
+        _cache_refinement(query, result)
+        return result
+
+    # 4. Default: no refinement
+    fallback = {"needs_refinement": False, "fields": []}
+    _cache_refinement(query, fallback)
+    return fallback
 
 
 # ---------------------------------------------------------------------------

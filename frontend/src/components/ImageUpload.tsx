@@ -109,11 +109,19 @@ export default function ImageUpload({
     return "text-[#ff3333]";
   };
 
+  const searchNorm = (searchQuery ?? "").toLowerCase().trim();
+  const detectedNorm = (result?.detected_product ?? "").toLowerCase().trim();
+  const searchAlreadyHasSuggested =
+    searchNorm.length > 0 &&
+    detectedNorm.length > 0 &&
+    (searchNorm.includes(detectedNorm) || detectedNorm.includes(searchNorm));
+
   const showSuggestion =
     result?.detected_product &&
     !suggestionDismissed &&
     !isProcessing &&
-    result.source !== "mock";
+    result.source !== "mock" &&
+    !searchAlreadyHasSuggested;
 
   return (
     <div className="border border-[#2a2520] bg-[#0d0b09] p-3">

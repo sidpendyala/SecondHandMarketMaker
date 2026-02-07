@@ -4,6 +4,7 @@ import {
   ConditionResponse,
   ConditionResult,
   ProductFieldsResponse,
+  RefinementResponse,
 } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -84,6 +85,23 @@ export async function verifyCondition(
     const err = await res
       .json()
       .catch(() => ({ detail: "Condition check failed" }));
+    throw new Error(err.detail || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function refineQuery(
+  query: string
+): Promise<RefinementResponse> {
+  const res = await fetch(`${API_BASE}/api/refine-query`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query }),
+  });
+  if (!res.ok) {
+    const err = await res
+      .json()
+      .catch(() => ({ detail: "Query refinement failed" }));
     throw new Error(err.detail || `HTTP ${res.status}`);
   }
   return res.json();

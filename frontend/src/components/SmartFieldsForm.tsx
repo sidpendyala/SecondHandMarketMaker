@@ -8,6 +8,8 @@ interface SmartFieldsFormProps {
   isLoading: boolean;
   onChange: (values: Record<string, string>) => void;
   prefilled?: Record<string, string>;
+  /** Keys already provided (e.g. from loading-screen refinement); these fields are hidden */
+  refinementSelections?: Record<string, string>;
 }
 
 export default function SmartFieldsForm({
@@ -15,8 +17,21 @@ export default function SmartFieldsForm({
   isLoading,
   onChange,
   prefilled,
+  refinementSelections,
 }: SmartFieldsFormProps) {
   const [values, setValues] = useState<Record<string, string>>({});
+
+  // Don't ask again for attributes already chosen in the loading-screen refinement
+  const refinementKeysLower = refinementSelections
+    ? new Set(
+        Object.keys(refinementSelections).map((k) => k.toLowerCase().trim())
+      )
+    : new Set<string>();
+  const visibleFields = refinementSelections
+    ? fields.filter(
+        (f) => !refinementKeysLower.has(f.key.toLowerCase().trim())
+      )
+    : fields;
 
   useEffect(() => {
     setValues({});
@@ -103,13 +118,15 @@ export default function SmartFieldsForm({
             </div>
           ))}
         </div>
-      ) : fields.length === 0 ? (
+      ) : visibleFields.length === 0 ? (
         <p className="py-4 text-center text-[10px] text-[#6b6560]">
-          NO FIELDS AVAILABLE
+          {fields.length === 0
+            ? "NO FIELDS AVAILABLE"
+            : "ALL DETAILS SET (FROM REFINEMENT)"}
         </p>
       ) : (
         <div className="space-y-2">
-          {fields.map((field) => (
+          {visibleFields.map((field) => (
             <div key={field.key}>
               <label className="mb-0.5 block text-[10px] text-[#6b6560]">
                 {field.name.toUpperCase()}

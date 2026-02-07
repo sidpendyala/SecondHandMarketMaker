@@ -26,6 +26,8 @@ interface SellAdvisorPanelProps {
   imagePreview?: string | null;
   conditionResult?: ConditionResult | null;
   onImagePreviewChange?: (preview: string | null) => void;
+  /** Keys/values from loading-screen refinement; these are not asked again in product details */
+  refinementSelections?: Record<string, string>;
 }
 
 export default function SellAdvisorPanel({
@@ -42,6 +44,7 @@ export default function SellAdvisorPanel({
   imagePreview,
   conditionResult,
   onImagePreviewChange,
+  refinementSelections,
 }: SellAdvisorPanelProps) {
   const confColor = {
     high: "text-[#33cc33]",
@@ -95,8 +98,14 @@ export default function SellAdvisorPanel({
           <SmartFieldsForm
             fields={productFields}
             isLoading={fieldsLoading}
-            onChange={onFieldsChange}
+            onChange={(formValues) =>
+              onFieldsChange({
+                ...(refinementSelections || {}),
+                ...formValues,
+              })
+            }
             prefilled={detectedAttributes}
+            refinementSelections={refinementSelections}
           />
         </div>
       </div>

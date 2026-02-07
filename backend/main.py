@@ -28,6 +28,7 @@ from services.ai_service import (
     analyze_condition_from_base64,
     detect_and_analyze_image,
     generate_product_fields,
+    check_query_refinement,
 )
 
 
@@ -151,6 +152,16 @@ class ProductFieldsResponse(BaseModel):
 
 class ProductFieldsRequest(BaseModel):
     query: str
+
+
+class RefineQueryRequest(BaseModel):
+    query: str
+
+
+class RefineQueryResponse(BaseModel):
+    query: str
+    needs_refinement: bool
+    fields: list[ProductFieldItem] = []
 
 
 # ---------------------------------------------------------------------------
@@ -354,6 +365,27 @@ async def product_fields(body: ProductFieldsRequest):
     return ProductFieldsResponse(
         query=body.query,
         fields=[ProductFieldItem(**f) for f in fields],
+    )
+
+
+@app.post("/api/refine-query", response_model=RefineQueryResponse)
+async def refine_query(body: RefineQueryRequest):
+    """
+    Check if a search query is too broad and suggest refinement parameters.
+    """
+    if not body.query or len(body.query.strip()) < 2:
+        raise HTTPException(status_code=400, detail="query is required")
+
+    result = await asyncio.to_thread(check_query_refinement, body.query.strip())
+    fields = []
+    if result.get("needs_refinement"):
+        for f in result.get("fields", []):
+            fields.append(ProductFieldItem(**f))
+
+    return RefineQueryResponse(
+        query=body.query,
+        needs_refinement=result.get("needs_refinement", False),
+        fields=fields,
     )
 
 

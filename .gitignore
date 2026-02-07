@@ -30,6 +30,7 @@ Thumbs.db
 
 # Cache
 backend/cache/product_fields_cache.json
+backend/cache/query_refinement_cache.json
 
 # Logs
 *.log
