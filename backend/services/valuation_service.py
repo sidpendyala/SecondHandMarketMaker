@@ -67,7 +67,8 @@ def calculate_fair_value(sold_items: list[dict]) -> dict:
 def find_deals(active_items: list[dict], fair_value: float, threshold: float = 0.20) -> list[dict]:
     """
     Filter active listings that are priced at least `threshold` (default 20 %)
-    below the Fair Market Value.
+    below the Fair Market Value. Deduplicates by URL so the same listing
+    never appears twice (API can return duplicates).
 
     Each returned item gets extra fields:
       - discount_pct: percentage below fair value (e.g. 25.3)
@@ -76,8 +77,15 @@ def find_deals(active_items: list[dict], fair_value: float, threshold: float = 0
     if fair_value <= 0:
         return []
 
+    seen_urls: set[str] = set()
     deals = []
     for item in active_items:
+        url = item.get("url") or ""
+        if url and url in seen_urls:
+            continue
+        if url:
+            seen_urls.add(url)
+
         price = item.get("price", 0)
         if price <= 0:
             continue

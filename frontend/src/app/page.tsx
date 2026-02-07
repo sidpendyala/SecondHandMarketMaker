@@ -223,9 +223,8 @@ export default function Home() {
     setConditionResult(null);
   }, []);
 
-  /** Home: reset everything to default state */
+  /** Home: clear everything but keep current mode (buy/sell) */
   const handleHomeClick = useCallback(() => {
-    setMode("buy");
     setBuyData(null);
     setSellData(null);
     setError(null);
@@ -312,7 +311,15 @@ export default function Home() {
   const hasData = (mode === "buy" ? !!buyData : !!sellData) && showResults;
 
   return (
-    <div className="min-h-screen bg-black">
+    <div className="relative min-h-screen bg-black">
+      {/* Shape Landing Hero background */}
+      <div className="shape-hero-bg" aria-hidden>
+        <div className="shape-blob shape-blob-1" />
+        <div className="shape-blob shape-blob-2" />
+        <div className="shape-blob shape-blob-3" />
+      </div>
+
+      <div className="relative z-10 flex min-h-screen flex-col">
       {/* Terminal Header */}
       <SearchHeader
         onSearch={handleSearch}
@@ -323,8 +330,8 @@ export default function Home() {
         onHomeClick={handleHomeClick}
       />
 
-      {/* Main */}
-      <div className="py-4">
+      {/* Main: grows to fill space so footer stays at bottom */}
+      <div className="flex flex-1 flex-col py-4">
         <ProgressLoader
           isLoading={isLoading}
           mode={mode}
@@ -333,20 +340,22 @@ export default function Home() {
           onRefinementSubmit={handleRefinementSubmit}
         />
 
-        {/* Error */}
+        {/* Error: centered when no other content */}
         {error && !isLoading && (
-          <div className="mx-auto max-w-md px-4 py-12 text-center">
-            <Frown className="mx-auto mb-2 h-6 w-6 text-[#ff3333]" />
-            <div className="text-xs font-bold text-[#ff3333]">
-              ANALYSIS FAILED
+          <div className="flex flex-1 flex-col items-center justify-center px-4">
+            <div className="animate-in-section mx-auto max-w-md text-center">
+              <Frown className="mx-auto mb-2 h-6 w-6 text-[#ff3333]" />
+              <div className="text-xs font-bold text-[#ff3333]">
+                ANALYSIS FAILED
+              </div>
+              <p className="mt-1 text-[11px] text-[#6b6560]">{error}</p>
             </div>
-            <p className="mt-1 text-[11px] text-[#6b6560]">{error}</p>
           </div>
         )}
 
         {/* ==================== BUY MODE ==================== */}
         {mode === "buy" && buyData && showResults && !isLoading && (
-          <>
+          <div className="animate-in-section">
             <StatsPanel data={buyData} />
 
             {/* Filter Summary */}
@@ -392,7 +401,7 @@ export default function Home() {
                   </button>
 
                   {showFiltered && buyData.filtered_items?.length > 0 && (
-                    <div className="border-t border-[#2a2520]">
+                    <div className="animate-in-section border-t border-[#2a2520]">
                       {buyData.filtered_items.map((item, idx) => (
                         <div
                           key={`filtered-${idx}`}
@@ -450,7 +459,7 @@ export default function Home() {
             <div className="mx-auto mt-4 max-w-6xl px-4">
               <div className="mb-3 flex items-center gap-2 border-b border-[#2a2520] pb-2">
                 <span className="text-xs font-bold text-[#39ff14]">
-                  ARBITRAGE OPPORTUNITIES
+                  UNDERPRICED OPPORTUNITIES
                 </span>
                 <span className="text-[10px] text-[#6b6560]">
                   {buyData.deals.length} DEALS
@@ -458,9 +467,12 @@ export default function Home() {
               </div>
 
               {buyData.deals.length > 0 ? (
-                <div className="grid grid-cols-1 gap-px bg-[#2a2520] sm:grid-cols-2 lg:grid-cols-3">
+                <div className="stagger-children grid grid-cols-1 bg-black sm:grid-cols-2 lg:grid-cols-3 [&>*:nth-child(2n)]:sm:border-r-0 [&>*:nth-child(3n)]:lg:border-r-0 [&>*]:opacity-0">
                   {buyData.deals.map((deal, idx) => (
-                    <div key={`${deal.url}-${idx}`} className="bg-black">
+                    <div
+                      key={`${deal.url}-${idx}`}
+                      className="border-r border-b border-[#2a2520] bg-black"
+                    >
                       <DealCard deal={deal} />
                     </div>
                   ))}
@@ -473,11 +485,12 @@ export default function Home() {
                 </div>
               )}
             </div>
-          </>
+          </div>
         )}
 
         {/* ==================== SELL MODE ==================== */}
         {mode === "sell" && sellData && showResults && !isLoading && (
+          <div className="animate-in-section">
           <SellAdvisorPanel
             data={sellData}
             productFields={productFields}
@@ -497,28 +510,32 @@ export default function Home() {
             onImagePreviewChange={setImagePreview}
             refinementSelections={refinementSelections}
           />
+          </div>
         )}
 
-        {/* Empty State */}
+        {/* Empty State: vertically and horizontally centered in remaining space */}
         {!hasData && !isLoading && !error && (
-          <div className="mx-auto max-w-md px-4 py-14 text-center">
-            <DollarSign className="mx-auto mb-2 h-6 w-6 text-[#2a2520]" />
-            <div className="text-xs font-bold text-[#39ff14]">
-              {mode === "buy" ? "READY TO SCAN" : "READY TO PRICE"}
+          <div className="flex flex-1 flex-col items-center justify-center px-6 py-8">
+            <div className="animate-in-section mx-auto max-w-lg text-center">
+              <DollarSign className="mx-auto mb-4 h-10 w-10 text-[#2a2520]" />
+              <div className="text-base font-bold tracking-tight text-[#39ff14]">
+                {mode === "buy" ? "READY TO SCAN" : "READY TO PRICE"}
+              </div>
+              <p className="mt-2 text-sm text-[#6b6560]">
+                {mode === "buy"
+                  ? "ENTER A PRODUCT ABOVE TO DISCOVER UNDERPRICED LISTINGS"
+                  : "ENTER YOUR PRODUCT ABOVE FOR MARKET-BACKED PRICING"}
+              </p>
             </div>
-            <p className="mt-1 text-[10px] text-[#6b6560]">
-              {mode === "buy"
-                ? "ENTER A PRODUCT ABOVE TO DISCOVER UNDERPRICED LISTINGS"
-                : "ENTER YOUR PRODUCT ABOVE FOR MARKET-BACKED PRICING"}
-            </p>
           </div>
         )}
       </div>
 
-      {/* Footer */}
-      <footer className="border-t border-[#2a2520] py-3 text-center text-[10px] text-[#6b6560]">
-        MARKETMAKER — AI-POWERED DEAL INTELLIGENCE — NOT FINANCIAL ADVICE
+      {/* Footer: sticks to bottom of viewport */}
+      <footer className="shrink-0 border-t border-[#2a2520] py-3 text-center text-[10px] text-[#6b6560]">
+        Find underpriced listings · Price with confidence · Second Hand MarketMaker
       </footer>
+      </div>
     </div>
   );
 }

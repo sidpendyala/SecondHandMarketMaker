@@ -89,41 +89,53 @@ def _extract_price_from_product(product: dict) -> float:
 
 EBAY_CONDITION_MAP = {
     # eBay standard condition labels -> (rating, label)
-    "new": (10, "Mint"),
-    "brand new": (10, "Mint"),
+    # Order matters when using startswith: longer/more specific keys checked first (see _condition_map_sorted).
     "new with tags": (10, "Mint"),
     "new with box": (10, "Mint"),
+    "brand new": (10, "Mint"),
+    "new": (10, "Mint"),
     "new without tags": (9, "Like New"),
     "new without box": (9, "Like New"),
     "new (other)": (9, "Like New"),
     "open box": (9, "Like New"),
-    "certified - refurbished": (8, "Like New"),
-    "seller refurbished": (7, "Good"),
-    "excellent - refurbished": (8, "Like New"),
-    "very good - refurbished": (7, "Good"),
-    "good - refurbished": (6, "Fair"),
     "like new": (9, "Like New"),
+    "certified refurbished": (8, "Like New"),
+    "certified - refurbished": (8, "Like New"),
+    "excellent - refurbished": (8, "Like New"),
+    "excellent": (8, "Like New"),
+    "seller refurbished": (7, "Good"),
+    "very good - refurbished": (7, "Good"),
+    "very good": (7, "Good"),
+    "used - very good": (7, "Good"),
+    "used - good": (7, "Good"),
+    "good - refurbished": (6, "Fair"),
+    "good": (7, "Good"),
     "pre-owned": (6, "Fair"),
     "used": (6, "Fair"),
-    "good": (7, "Good"),
-    "very good": (7, "Good"),
     "acceptable": (5, "Fair"),
+    "used - acceptable": (5, "Fair"),
     "for parts or not working": (2, "Poor"),
     "for parts": (2, "Poor"),
 }
+
+
+def _condition_map_sorted():
+    """Iterate condition map with longest keys first so 'used - good' matches before 'used'."""
+    return sorted(EBAY_CONDITION_MAP.items(), key=lambda x: -len(x[0]))
 
 
 def _extract_condition_from_subtitles(subtitles: list) -> dict | None:
     """
     Try to extract condition info from search result subTitles.
     Returns { "rating": int, "label": str, "notes": str } or None.
+    Uses longest-key-first so e.g. "Used - Good" matches "used - good" (7) not "used" (6).
     """
     if not subtitles:
         return None
 
     for sub in subtitles:
         sub_lower = sub.strip().lower()
-        for key, (rating, label) in EBAY_CONDITION_MAP.items():
+        for key, (rating, label) in _condition_map_sorted():
             if key == sub_lower or sub_lower.startswith(key):
                 return {
                     "rating": rating,
@@ -250,7 +262,7 @@ def scrape_listing_condition(listing_url: str) -> dict | None:
             return None
 
         condition_lower = condition_text.strip().lower()
-        for key, (rating, label) in EBAY_CONDITION_MAP.items():
+        for key, (rating, label) in _condition_map_sorted():
             if key == condition_lower or condition_lower.startswith(key):
                 return {
                     "rating": rating,
@@ -258,10 +270,24 @@ def scrape_listing_condition(listing_url: str) -> dict | None:
                     "notes": f"Seller-stated condition: {condition_text.strip()}",
                 }
 
-        # Unknown condition label -- still return something
+        # Unknown condition: infer from keywords instead of defaulting everything to 6
+        if "mint" in condition_lower or "new" in condition_lower:
+            rating, label = 9, "Like New"
+        elif "excellent" in condition_lower:
+            rating, label = 8, "Like New"
+        elif "very good" in condition_lower:
+            rating, label = 7, "Good"
+        elif "good" in condition_lower:
+            rating, label = 7, "Good"
+        elif "acceptable" in condition_lower:
+            rating, label = 5, "Fair"
+        elif "parts" in condition_lower or "not working" in condition_lower:
+            rating, label = 2, "Poor"
+        else:
+            rating, label = 6, "Fair"
         return {
-            "rating": 6,
-            "label": "Fair",
+            "rating": rating,
+            "label": label,
             "notes": f"Listed condition: {condition_text.strip()}",
         }
 

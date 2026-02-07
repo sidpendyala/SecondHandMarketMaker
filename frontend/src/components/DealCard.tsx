@@ -10,9 +10,10 @@ import type { DealItem } from "@/lib/types";
 
 interface DealCardProps {
   deal: DealItem;
+  className?: string;
 }
 
-export default function DealCard({ deal }: DealCardProps) {
+export default function DealCard({ deal, className }: DealCardProps) {
   const [imageError, setImageError] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
 
@@ -29,7 +30,8 @@ export default function DealCard({ deal }: DealCardProps) {
   })();
 
   return (
-    <div className="group border border-[#2a2520] bg-[#0d0b09] transition-colors hover:border-[#39ff14]/40">
+    <div className={`holographic-card transition-section ${className ?? ""}`}>
+      <div className="holographic-card-inner group transition-colors duration-[280ms] [transition-timing-function:cubic-bezier(0.22,1,0.36,1)]">
       {/* Image */}
       <div className="relative aspect-[4/3] overflow-hidden bg-black">
         {!imageError ? (
@@ -142,6 +144,7 @@ export default function DealCard({ deal }: DealCardProps) {
             </span>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

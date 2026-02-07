@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import type { ProductField } from "@/lib/types";
+import { DropdownSelect } from "@/components/ui/dropdown-select";
 
 interface SmartFieldsFormProps {
   fields: ProductField[];
@@ -106,7 +107,6 @@ export default function SmartFieldsForm({
         <span className="text-[10px] font-bold text-[#39ff14]">
           PRODUCT DETAILS
         </span>
-        <span className="text-[8px] text-[#6b6560]">[AI GENERATED]</span>
       </div>
 
       {isLoading ? (
@@ -133,7 +133,7 @@ export default function SmartFieldsForm({
               </label>
 
               {field.type === "boolean" ? (
-                <label className="flex cursor-pointer items-center gap-2 border border-[#2a2520] bg-black px-2.5 py-1.5 hover:border-[#6b6560]">
+                <label className="animated-checkbox flex items-center gap-2 border border-[#2a2520] bg-black px-2.5 py-2 hover:border-[#6b6560]">
                   <input
                     type="checkbox"
                     checked={values[field.key] === "Yes"}
@@ -143,27 +143,21 @@ export default function SmartFieldsForm({
                         e.target.checked ? "Yes" : "No"
                       )
                     }
-                    className="h-3 w-3 border-[#2a2520] bg-black text-[#39ff14] focus:ring-[#39ff14]/30"
+                    aria-label={field.name}
                   />
                   <span className="text-[11px] text-[#e8e6e3]">
                     {field.name}
                   </span>
                 </label>
               ) : (
-                <select
+                <DropdownSelect
                   value={values[field.key] || ""}
-                  onChange={(e) => handleChange(field.key, e.target.value)}
-                  className="w-full border border-[#2a2520] bg-black px-2.5 py-1.5 text-[11px] text-[#e8e6e3] outline-none focus:border-[#39ff14]"
-                >
-                  <option value="">
-                    SELECT...
-                  </option>
-                  {field.options.map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={(v) => handleChange(field.key, v)}
+                  options={field.options}
+                  placeholder="SELECT..."
+                  size="sm"
+                  aria-label={field.name}
+                />
               )}
             </div>
           ))}

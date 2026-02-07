@@ -14,7 +14,7 @@ export default function StatsPanel({ data }: StatsPanelProps) {
   };
 
   return (
-    <div className="mx-auto max-w-6xl px-4">
+    <div className="transition-section mx-auto max-w-6xl px-4">
       {/* Header bar */}
       <div className="mb-2 flex items-center gap-3 border-b border-[#2a2520] pb-2">
         <span className="text-xs font-bold text-[#39ff14]">MARKET PULSE</span>

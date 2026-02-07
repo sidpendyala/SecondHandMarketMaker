@@ -55,7 +55,7 @@ export default function SellAdvisorPanel({
   const recommendedTier = data.recommended_tier || "Competitive";
 
   return (
-    <div className="mx-auto max-w-6xl px-4">
+    <div className="transition-section mx-auto max-w-6xl px-4">
       {/* Header */}
       <div className="mb-2 flex items-center gap-3 border-b border-[#2a2520] pb-2">
         <span className="text-xs font-bold text-[#39ff14]">SELL ADVISOR</span>
@@ -137,7 +137,7 @@ export default function SellAdvisorPanel({
             </span>
           </div>
           <div
-            className={`grid grid-cols-1 gap-px bg-[#2a2520] sm:grid-cols-2 lg:grid-cols-4 transition-opacity duration-200 ${
+            className={`grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 transition-opacity duration-200 ${
               priceRefreshing ? "opacity-40" : "opacity-100"
             }`}
           >
@@ -146,7 +146,7 @@ export default function SellAdvisorPanel({
               return (
                 <div
                   key={tier.name}
-                  className={`bg-black p-3 ${isRec ? "border-l-2 border-l-[#39ff14]" : ""}`}
+                  className={`bg-black p-3 ${isRec ? "border-l-2 border-l-[#39ff14] price-block-glow-recommended" : "price-block-glow"}`}
                 >
                   {/* Tier header */}
                   <div className="mb-1 flex items-center justify-between">

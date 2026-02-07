@@ -124,9 +124,9 @@ export default function ImageUpload({
     !searchAlreadyHasSuggested;
 
   return (
-    <div className="border border-[#2a2520] bg-[#0d0b09] p-3">
-      <div className="mb-2 text-[10px] font-bold text-[#39ff14]">
-        PHOTO UPLOAD
+    <div className="overflow-hidden rounded-lg border border-[#2a2520] bg-[#0d0b09] p-3">
+      <div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[#39ff14]">
+        Photo upload
       </div>
 
       {!preview ? (
@@ -138,14 +138,29 @@ export default function ImageUpload({
           onDragLeave={() => setDragOver(false)}
           onDrop={handleDrop}
           onClick={() => inputRef.current?.click()}
-          className={`flex cursor-pointer flex-col items-center justify-center border border-dashed py-8 transition-colors ${
+          className={`relative flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed py-10 transition-all duration-200 ${
             dragOver
-              ? "border-[#39ff14] bg-[#39ff14]/5"
-              : "border-[#2a2520] hover:border-[#6b6560]"
+              ? "border-[#39ff14] bg-[#39ff14]/10 ring-2 ring-[#39ff14]/30"
+              : "border-[#2a2520] bg-[#0a0908] hover:border-[#3d3832] hover:bg-[#0d0b09]"
           }`}
+          style={{
+            backgroundImage: dragOver
+              ? "none"
+              : "linear-gradient(rgba(42,37,32,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(42,37,32,0.4) 1px, transparent 1px)",
+            backgroundSize: "16px 16px",
+          }}
         >
-          <Upload className="mb-1.5 h-5 w-5 text-[#6b6560]" />
-          <p className="text-[11px] text-[#6b6560]">DROP IMAGE OR CLICK</p>
+          <Upload
+            className={`mb-2 h-6 w-6 transition-colors ${
+              dragOver ? "text-[#39ff14]" : "text-[#6b6560]"
+            }`}
+          />
+          <p className="text-xs font-medium text-[#e8e6e3]">
+            Upload file
+          </p>
+          <p className="mt-0.5 text-[11px] text-[#6b6560]">
+            Drag or drop your image here or click to upload
+          </p>
           <input
             ref={inputRef}
             type="file"
@@ -156,7 +171,7 @@ export default function ImageUpload({
         </div>
       ) : (
         <div className="space-y-2">
-          <div className="relative overflow-hidden">
+          <div className="relative overflow-hidden rounded-lg">
             <img
               src={preview}
               alt="Product"

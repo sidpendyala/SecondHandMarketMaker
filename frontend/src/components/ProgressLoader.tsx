@@ -12,9 +12,9 @@ import {
   Layers,
   ScanSearch,
   TrendingUp,
-  ChevronDown,
 } from "lucide-react";
 import type { ProductField } from "@/lib/types";
+import { DropdownSelect } from "@/components/ui/dropdown-select";
 
 type Mode = "buy" | "sell";
 
@@ -198,12 +198,12 @@ export default function ProgressLoader({
   };
 
   return (
-    <div className="mx-auto max-w-xl px-4 py-12">
-      <div className="border border-[#2a2520] bg-[#0d0b09] p-5">
+    <div className="animate-in-section mx-auto max-w-4xl px-4 py-16">
+      <div className="border border-[#2a2520] bg-[#0d0b09] px-12 py-10">
         {/* Status */}
-        <div className="mb-4 text-center">
+        <div className="mb-6 text-center">
           <div
-            className={`mb-2 text-sm font-bold ${
+            className={`mb-3 text-xl font-bold tracking-tight ${
               completed
                 ? "text-[#33cc33]"
                 : isPaused
@@ -219,7 +219,7 @@ export default function ProgressLoader({
                   ? "SCANNING MARKET..."
                   : "ANALYZING PRICES..."}
           </div>
-          <div className="text-[10px] text-[#6b6560]">
+          <div className="text-base text-[#6b6560]">
             {completed
               ? "LOADING RESULTS"
               : isPaused
@@ -229,10 +229,10 @@ export default function ProgressLoader({
         </div>
 
         {/* Progress bar */}
-        <div className="mb-3">
-          <div className="h-1 w-full bg-[#2a2520]">
+        <div className="mb-6">
+          <div className="h-2 w-full bg-[#2a2520]">
             <div
-              className={`h-full transition-all duration-150 ${
+              className={`h-full transition-all duration-[280ms] [transition-timing-function:cubic-bezier(0.22,1,0.36,1)] ${
                 completed
                   ? "bg-[#33cc33]"
                   : isPaused
@@ -242,7 +242,7 @@ export default function ProgressLoader({
               style={{ width: `${Math.round(progress)}%` }}
             />
           </div>
-          <div className="mt-1 flex justify-between text-[10px] text-[#6b6560]">
+          <div className="mt-2 flex justify-between text-base text-[#6b6560]">
             <span>{Math.round(progress)}%</span>
             {!completed && !isPaused && <span>PLEASE WAIT</span>}
             {isPaused && <span>WAITING FOR INPUT</span>}
@@ -251,39 +251,30 @@ export default function ProgressLoader({
 
         {/* Refinement fields (shown when paused) */}
         {isPaused && refinementFields && refinementFields.length > 0 && (
-          <div className="mt-4 border-t border-[#2a2520] pt-4">
+          <div className="mt-6 border-t border-[#2a2520] pt-6">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {refinementFields.map((field) => (
                 <div key={field.key}>
-                  <label className="mb-1 block text-[10px] font-bold text-[#6b6560] uppercase">
+                  <label className="mb-1.5 block text-xs font-bold text-[#6b6560] uppercase tracking-wide">
                     {field.name}
                   </label>
-                  <div className="relative">
-                    <select
-                      value={refinementValues[field.key] || ""}
-                      onChange={(e) =>
-                        handleRefinementChange(field.key, e.target.value)
-                      }
-                      className="w-full appearance-none border border-[#2a2520] bg-black px-3 py-2 pr-8 text-xs text-[#e8e6e3] outline-none transition-colors focus:border-[#39ff14]/60"
-                    >
-                      <option value="">Any</option>
-                      {field.options.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-[#6b6560]" />
-                  </div>
+                  <DropdownSelect
+                    value={refinementValues[field.key] || ""}
+                    onValueChange={(v) => handleRefinementChange(field.key, v)}
+                    options={field.options}
+                    emptyOptionLabel="Any"
+                    size="md"
+                    aria-label={field.name}
+                  />
                 </div>
               ))}
             </div>
 
             {/* Continue only */}
-            <div className="mt-4">
+            <div className="mt-5">
               <button
                 onClick={handleContinue}
-                className="w-full border border-[#39ff14] bg-[#39ff14]/10 px-4 py-2 text-xs font-bold text-[#39ff14] transition-colors hover:bg-[#39ff14]/20"
+                className="w-full border border-[#39ff14] bg-[#39ff14]/10 px-4 py-2.5 text-sm font-bold text-[#39ff14] transition-colors hover:bg-[#39ff14]/20"
               >
                 CONTINUE
               </button>
@@ -293,7 +284,7 @@ export default function ProgressLoader({
 
         {/* Phase dots (hidden when paused to reduce clutter) */}
         {!isPaused && (
-          <div className="flex items-center justify-center gap-1">
+          <div className="mt-6 flex items-center justify-center gap-2">
             {phases.map((phase, idx) => {
               const isActive = progress >= phase.threshold;
               const isCurrent = !completed && phase === currentPhase;
@@ -301,12 +292,12 @@ export default function ProgressLoader({
               return (
                 <div
                   key={idx}
-                  className={`h-1 transition-all duration-500 ${
+                  className={`h-2 transition-all duration-500 ${
                     isCurrent
-                      ? "w-4 bg-[#39ff14]"
+                      ? "w-6 bg-[#39ff14]"
                       : isActive
-                        ? "w-1 bg-[#39ff14]/40"
-                        : "w-1 bg-[#2a2520]"
+                        ? "w-2 bg-[#39ff14]/40"
+                        : "w-2 bg-[#2a2520]"
                   } ${completed ? "!bg-[#33cc33]/40" : ""}`}
                 />
               );

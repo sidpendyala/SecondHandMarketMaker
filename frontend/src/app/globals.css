@@ -128,6 +128,308 @@
   --sidebar-ring: #39ff14;
 }
 
+/* Site-wide transitions (Shape Landing Hero style) */
+:root {
+  --transition-fast: 150ms;
+  --transition-normal: 280ms;
+  --transition-slow: 400ms;
+  --ease-out-smooth: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out-smooth: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/* Bubble text (21st.dev / thanh style): soft 3D rounded letters – home button */
+.bubble-text {
+  color: #39ff14 !important; /* override any inherited text color */
+  font-weight: 700;
+  text-shadow:
+    0 0 8px rgba(57, 255, 20, 0.5),
+    0 0 16px rgba(57, 255, 20, 0.2),
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 2px 4px rgba(0, 0, 0, 0.3),
+    1px 2px 2px rgba(26, 138, 26, 0.5),
+    2px 4px 4px rgba(26, 138, 26, 0.3),
+    3px 5px 6px rgba(0, 0, 0, 0.2);
+  letter-spacing: 0.02em;
+}
+
+.bubble-text .bubble-char {
+  display: inline-block;
+  transition: transform var(--transition-fast) var(--ease-out-smooth);
+}
+
+.bubble-text:hover .bubble-char {
+  transform: translateY(-1px);
+}
+
+.bubble-text .bubble-char:nth-child(odd):hover {
+  transform: translateY(-2px) scale(1.05);
+}
+
+.bubble-text .bubble-char:nth-child(even):hover {
+  transform: translateY(-2px) scale(1.03);
+}
+
+/* Shape Landing Hero: floating organic shapes behind content */
+@keyframes shape-float-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(2%, -1.5%) scale(1.02); }
+  66% { transform: translate(-1.5%, 2%) scale(0.98); }
+}
+@keyframes shape-float-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-2%, 1%) scale(1.03); }
+}
+@keyframes shape-float-3 {
+  0%, 100% { transform: translate(-50%, -50%) translate(0, 0); }
+  40% { transform: translate(-50%, -50%) translate(1.5%, -2%); }
+  80% { transform: translate(-50%, -50%) translate(-1%, 1.5%); }
+}
+
+.shape-hero-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.shape-hero-bg .shape-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.12;
+}
+
+.shape-hero-bg .shape-blob-1 {
+  width: min(70vw, 520px);
+  height: min(70vw, 520px);
+  top: -15%;
+  right: -10%;
+  background: radial-gradient(circle, rgba(57, 255, 20, 0.35) 0%, transparent 70%);
+  animation: shape-float-1 18s ease-in-out infinite;
+}
+
+.shape-hero-bg .shape-blob-2 {
+  width: min(55vw, 400px);
+  height: min(55vw, 400px);
+  bottom: 10%;
+  left: -8%;
+  background: radial-gradient(circle, rgba(34, 197, 94, 0.25) 0%, transparent 70%);
+  animation: shape-float-2 22s ease-in-out infinite;
+}
+
+.shape-hero-bg .shape-blob-3 {
+  width: min(40vw, 280px);
+  height: min(40vw, 280px);
+  top: 45%;
+  left: 50%;
+  background: radial-gradient(circle, rgba(57, 255, 20, 0.15) 0%, transparent 65%);
+  animation: shape-float-3 20s ease-in-out infinite;
+}
+
+/* Content transitions: fade-in-up for sections */
+@keyframes page-fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.transition-section {
+  transition: opacity var(--transition-normal) var(--ease-out-smooth),
+    transform var(--transition-normal) var(--ease-out-smooth);
+}
+
+.animate-in-section {
+  animation: page-fade-in-up var(--transition-slow) var(--ease-out-smooth) forwards;
+}
+
+/* Stagger children (use with .stagger-children and delay on children) */
+.stagger-children > * {
+  animation: page-fade-in-up var(--transition-slow) var(--ease-out-smooth) forwards;
+}
+.stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-children > *:nth-child(2) { animation-delay: 45ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 90ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 135ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 180ms; }
+.stagger-children > *:nth-child(6) { animation-delay: 225ms; }
+.stagger-children > *:nth-child(n+7) { animation-delay: 270ms; }
+
+.transition-expand {
+  transition: height var(--transition-normal) var(--ease-out-smooth),
+    opacity var(--transition-normal) var(--ease-out-smooth);
+}
+
+/* Rainbow button: animated gradient border (Magic UI style) */
+@keyframes rainbow-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.rainbow-button-wrapper {
+  position: relative;
+  padding: 2px;
+  border-radius: 4px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.rainbow-button-wrapper::before {
+  content: "";
+  position: absolute;
+  inset: -100%;
+  background: conic-gradient(
+    from 0deg,
+    #39ff14,
+    #22c55e,
+    #0ea5e9,
+    #8b5cf6,
+    #ec4899,
+    #f97316,
+    #39ff14
+  );
+  animation: rainbow-rotate 2.5s linear infinite;
+}
+.rainbow-button-wrapper:has(button:disabled)::before {
+  display: none;
+}
+.rainbow-button-wrapper:has(button:disabled) {
+  background: #2a2520;
+}
+.rainbow-button-inner {
+  position: relative;
+  z-index: 10;
+  border-radius: 2px;
+  height: 100%;
+  min-height: 2rem;
+}
+
+/* Glow effect for price target blocks (motion-primitives style) */
+@keyframes glow-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 16px rgba(57, 255, 20, 0.12), 0 0 32px rgba(57, 255, 20, 0.06);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(57, 255, 20, 0.18), 0 0 48px rgba(57, 255, 20, 0.08);
+  }
+}
+.price-block-glow {
+  box-shadow: 0 0 16px rgba(57, 255, 20, 0.12), 0 0 32px rgba(57, 255, 20, 0.06);
+  animation: glow-breathe 3s ease-in-out infinite;
+}
+.price-block-glow-recommended {
+  box-shadow: 0 0 20px rgba(57, 255, 20, 0.2), 0 0 40px rgba(57, 255, 20, 0.1);
+  animation: glow-breathe 3s ease-in-out infinite;
+}
+
+/* Holographic card effect for buy-side deal cards */
+@keyframes holographic-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.holographic-card {
+  position: relative;
+  padding: 2px;
+  overflow: hidden;
+}
+.holographic-card::before {
+  content: "";
+  position: absolute;
+  inset: -50%;
+  background: conic-gradient(
+    from 0deg,
+    #39ff14,
+    #22c55e,
+    #0ea5e9,
+    #6366f1,
+    #8b5cf6,
+    #ec4899,
+    #f97316,
+    #39ff14
+  );
+  animation: holographic-rotate 8s linear infinite;
+  opacity: 0.9;
+}
+.holographic-card:not(:hover)::before {
+  animation: none;
+  opacity: 0.4;
+}
+.holographic-card-inner {
+  position: relative;
+  z-index: 10;
+  background: #0d0b09;
+  min-height: 100%;
+}
+
+/* Animated checkbox (molecule-ui style), brand lime color – aligned inside label on all screens */
+.animated-checkbox {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  min-height: 2rem;
+  padding-left: 2.125rem;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.animated-checkbox input[type="checkbox"] {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+/* Box: inset from left to sit inside border, vertically centered within min-height */
+.animated-checkbox::before {
+  content: "";
+  position: absolute;
+  left: 0.625rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  border: 2px solid #2a2520;
+  background: #0d0b09;
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.animated-checkbox:hover::before {
+  border-color: #3d3832;
+}
+.animated-checkbox:has(input:checked)::before {
+  background: #39ff14;
+  border-color: #39ff14;
+  box-shadow: 0 0 0 1px #39ff14;
+}
+.animated-checkbox::after {
+  content: "";
+  position: absolute;
+  left: 0.875rem;
+  top: 50%;
+  width: 0.35rem;
+  height: 0.6rem;
+  margin-top: -0.3rem; /* center 0.6rem-tall shape */
+  border-right: 2px solid #0d0b09;
+  border-bottom: 2px solid #0d0b09;
+  transform-origin: 0 100%; /* bottom-left so check rotates straight */
+  transform: rotate(-45deg) scale(0);
+  opacity: 0;
+  transition: transform 0.2s ease, opacity 0.15s ease;
+}
+.animated-checkbox:has(input:checked)::after {
+  transform: rotate(-45deg) scale(1);
+  opacity: 1;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

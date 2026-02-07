@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
+import { useTextScramble } from "@/hooks/useTextScramble";
+import BubbleText from "@/components/BubbleText";
 
 type Mode = "buy" | "sell";
 
@@ -24,6 +26,17 @@ export default function SearchHeader({
   onHomeClick,
 }: SearchHeaderProps) {
   const [query, setQuery] = useState("");
+  const [inputFocused, setInputFocused] = useState(false);
+
+  const placeholderText =
+    mode === "buy"
+      ? "Enter product to scan..."
+      : "Enter product to price...";
+  const { display: placeholderDisplay } = useTextScramble(placeholderText, mode, {
+    stepInterval: 40,
+    scrambleInterval: 35,
+    runOnMount: true,
+  });
 
   useEffect(() => {
     if (externalQuery === undefined) {
@@ -50,7 +63,7 @@ export default function SearchHeader({
   ];
 
   return (
-    <div className="border-b border-[#2a2520] bg-black px-4 py-3">
+    <div className="border-b border-[#2a2520] bg-black px-4 py-3 transition-colors duration-[var(--transition-normal)]">
       <div className="mx-auto max-w-6xl">
         {/* Top row: brand (home) + mode tabs */}
         <div className="mb-3 flex items-center justify-between">
@@ -58,35 +71,43 @@ export default function SearchHeader({
             <button
               type="button"
               onClick={onHomeClick}
-              className="text-left transition-opacity hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-[#39ff14]/50 focus:ring-offset-0"
+              className="text-left transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[#39ff14]/50 focus:ring-offset-0"
               aria-label="Go to home"
             >
-              <span className="text-sm font-bold text-[#39ff14]">
-                SECOND HAND MARKETMAKER
-              </span>
+              <BubbleText text="SECOND HAND MARKETMAKER" className="text-sm" />
             </button>
             <span className="text-xs text-[#6b6560]">
               AI DEAL INTELLIGENCE
             </span>
           </div>
 
-          <div className="flex items-center gap-px">
+          {/* Tubelight-style BUY / SELL tabs (neon glow on active, sliding pill) */}
+          <div className="relative flex rounded-sm border border-[#2a2520] bg-[#0d0b09] p-0.5">
+            <div
+              className="absolute bottom-0.5 left-0.5 top-0.5 w-[calc(50%-2px)] rounded-[2px] bg-[#39ff14] transition-[transform] duration-[280ms] [transition-timing-function:cubic-bezier(0.22,1,0.36,1)]"
+              style={{
+                boxShadow:
+                  "0 0 12px 3px rgba(57, 255, 20, 0.45), 0 0 24px 2px rgba(57, 255, 20, 0.2)",
+                transform: mode === "sell" ? "translateX(100%)" : "translateX(0)",
+              }}
+              aria-hidden
+            />
             <button
               onClick={() => onModeChange("buy")}
-              className={`px-3 py-1 text-xs font-bold tracking-wide transition-colors ${
+              className={`relative z-10 w-14 py-1.5 text-xs font-bold tracking-wide transition-colors duration-[280ms] [transition-timing-function:cubic-bezier(0.22,1,0.36,1)] ${
                 mode === "buy"
-                  ? "bg-[#39ff14] text-black"
-                  : "bg-[#1a1714] text-[#6b6560] hover:text-[#e8e6e3]"
+                  ? "text-black"
+                  : "text-[#6b6560] hover:text-[#e8e6e3]"
               }`}
             >
               BUY
             </button>
             <button
               onClick={() => onModeChange("sell")}
-              className={`px-3 py-1 text-xs font-bold tracking-wide transition-colors ${
+              className={`relative z-10 w-14 py-1.5 text-xs font-bold tracking-wide transition-colors duration-[280ms] [transition-timing-function:cubic-bezier(0.22,1,0.36,1)] ${
                 mode === "sell"
-                  ? "bg-[#39ff14] text-black"
-                  : "bg-[#1a1714] text-[#6b6560] hover:text-[#e8e6e3]"
+                  ? "text-black"
+                  : "text-[#6b6560] hover:text-[#e8e6e3]"
               }`}
             >
               SELL
@@ -96,38 +117,49 @@ export default function SearchHeader({
 
         {/* Command-line search bar */}
         <form onSubmit={handleSubmit}>
-          <div className="flex items-center border border-[#2a2520] bg-[#0d0b09]">
+          <div className="relative flex items-center border border-[#2a2520] bg-[#0d0b09]">
             <span className="px-3 text-xs text-[#39ff14]">
               {mode === "buy" ? "FIND>" : "SELL>"}
             </span>
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={
-                mode === "buy"
-                  ? "Enter product to scan..."
-                  : "Enter product to price..."
-              }
-              className="h-9 flex-1 bg-transparent text-sm text-[#e8e6e3] placeholder-[#6b6560] outline-none"
-              disabled={isLoading}
-            />
-            <button
-              type="submit"
-              disabled={!query.trim() || isLoading}
-              className="flex h-9 items-center gap-1.5 bg-[#39ff14] px-4 text-xs font-bold text-black transition-colors hover:bg-[#32cd32] disabled:opacity-30"
-            >
-              {isLoading ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                "GO"
+            <div className="relative h-9 flex-1">
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onFocus={() => setInputFocused(true)}
+                onBlur={() => setInputFocused(false)}
+                aria-label={placeholderText}
+                className="h-full w-full bg-transparent py-2 pr-2 text-sm text-[#e8e6e3] outline-none"
+                disabled={isLoading}
+              />
+              {/* Text scramble placeholder: show when empty and (first load or mode just switched) */}
+              {!query.trim() && !inputFocused && (
+                <div
+                  className="pointer-events-none absolute inset-0 flex items-center py-2 pl-1 pr-2 text-sm text-[#6b6560]"
+                  aria-hidden
+                >
+                  <span className="truncate">{placeholderDisplay}</span>
+                </div>
               )}
-            </button>
+            </div>
+            <span className="rainbow-button-wrapper h-9">
+              <button
+                type="submit"
+                disabled={!query.trim() || isLoading}
+                className="rainbow-button-inner flex h-full w-full items-center justify-center gap-1.5 bg-[#0d0b09] px-4 text-xs font-bold text-[#39ff14] transition-colors hover:bg-[#1a1714] hover:text-[#39ff14] disabled:bg-[#1a1714] disabled:opacity-30 disabled:text-[#6b6560]"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  "GO"
+                )}
+              </button>
+            </span>
           </div>
         </form>
 
-        {/* Example search buttons */}
-        <div className="mt-2 flex flex-wrap items-center gap-1">
+        {/* Example search buttons (gradient-button style) */}
+        <div className="mt-2 flex flex-wrap items-center gap-2">
           <span className="mr-1 text-[10px] text-[#6b6560]">
             Examples:
           </span>
@@ -139,9 +171,27 @@ export default function SearchHeader({
                 onSearch(s);
               }}
               disabled={isLoading}
-              className="border border-[#2a2520] bg-[#0d0b09] px-2 py-0.5 text-[10px] text-[#6b6560] transition-colors hover:border-[#39ff14] hover:text-[#39ff14] disabled:opacity-30"
+              className="group relative rounded-md px-2.5 py-1 text-[10px] font-medium transition-all duration-200 disabled:opacity-30"
+              style={{
+                background:
+                  "linear-gradient(135deg, #0f1410 0%, #1a2518 50%, #0d130c 100%)",
+                color: "#8fa88a",
+                boxShadow:
+                  "inset 0 1px 0 rgba(57, 255, 20, 0.06), 0 1px 2px rgba(0,0,0,0.4)",
+              }}
             >
-              {s.toUpperCase()}
+              <span className="relative z-10 transition-colors duration-200 group-hover:text-[#39ff14] group-disabled:group-hover:text-[#8fa88a]">
+                {s.toUpperCase()}
+              </span>
+              <span
+                className="pointer-events-none absolute inset-0 rounded-md opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-disabled:opacity-0"
+                style={{
+                  background:
+                    "linear-gradient(135deg, rgba(57, 255, 20, 0.12) 0%, rgba(45, 143, 15, 0.08) 50%, rgba(57, 255, 20, 0.06) 100%)",
+                  boxShadow: "0 0 12px rgba(57, 255, 20, 0.15)",
+                }}
+                aria-hidden
+              />
             </button>
           ))}
         </div>
