@@ -185,7 +185,6 @@ def _build_ebay_search_url(query: str, **kwargs) -> str:
 
 def _fetch_search(ebay_url: str) -> list[dict]:
     """Call the RapidAPI search endpoint and return the products list."""
-    encoded = urllib.parse.quote(ebay_url, safe="")
     resp = requests.get(
         f"{BASE_URL}/search_get.php",
         headers=_get_headers(),
@@ -194,7 +193,11 @@ def _fetch_search(ebay_url: str) -> list[dict]:
     )
     resp.raise_for_status()
     data = resp.json()
-    return data.get("body", {}).get("products", [])
+    # Accept both shapes: { "body": { "products": [...] } } and { "products": [...] }
+    products = data.get("body", {}).get("products", []) if isinstance(data.get("body"), dict) else []
+    if not products and isinstance(data.get("products"), list):
+        products = data["products"]
+    return products
 
 
 # ---------------------------------------------------------------------------
@@ -240,7 +243,7 @@ def scrape_listing_condition(listing_url: str) -> dict | None:
             timeout=15,
         )
         resp.raise_for_status()
-        body = resp.json().get("body", {})
+        body = _get_product_body(resp)
 
         condition_text = body.get("condition", "")
         if not condition_text:
@@ -265,6 +268,15 @@ def scrape_listing_condition(listing_url: str) -> dict | None:
     except Exception as exc:
         print(f"[ebay_client] scrape_listing_condition error: {exc}")
         return None
+
+
+def _get_product_body(resp) -> dict:
+    """Get product detail body from Single Product response. Handles body vs top-level."""
+    data = resp.json()
+    body = data.get("body")
+    if isinstance(body, dict):
+        return body
+    return data if isinstance(data, dict) else {}
 
 
 def search_active(query: str) -> list[dict]:

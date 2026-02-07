@@ -4,6 +4,7 @@ MarketMaker API - Agentic Deal Finder Backend
 
 import asyncio
 import base64
+import os
 from typing import Optional
 
 from fastapi import FastAPI, Query, HTTPException, UploadFile, File
@@ -13,6 +14,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+import requests as _requests
 from services.ebay_client import search_sold, search_active, scrape_listing_condition
 from services.valuation_service import (
     calculate_fair_value,
@@ -38,13 +40,16 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Allow Next.js dev server
+# CORS: allow any *.vercel.app and localhost (no FRONTEND_URL needed)
+_origin_regex = r"https://.*\.vercel\.app$|http://localhost(:\d+)?$|http://127\.0\.0\.1(:\d+)?$"
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=[],  # use regex below; if set, allow_origin_regex is ignored
+    allow_origin_regex=_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 
@@ -180,7 +185,15 @@ async def market_maker(query: str = Query(..., min_length=2, description="Produc
     6. Condition-based filtering and scoring
     """
     # Step 1 – The Quant: sold history
-    sold_items = search_sold(query)
+    try:
+        sold_items = search_sold(query)
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except _requests.RequestException as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"eBay search failed: {e}. Check RAPID_API_KEY and RapidAPI subscription.",
+        )
 
     # Step 2 – Valuation
     valuation = calculate_fair_value(sold_items)
@@ -193,7 +206,12 @@ async def market_maker(query: str = Query(..., min_length=2, description="Produc
         )
 
     # Step 3 – The Scout: active listings
-    active_items = search_active(query)
+    try:
+        active_items = search_active(query)
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except _requests.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"eBay search failed: {e}")
 
     # Step 4 – Filter deals (price threshold)
     deals = find_deals(active_items, fair_value)
@@ -293,13 +311,22 @@ async def sell_advisor(body: SellAdvisorRequest):
         if extras:
             search_query = f"{body.query} {extras}"
 
-    sold_items = search_sold(search_query)
+    try:
+        sold_items = search_sold(search_query)
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except _requests.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"eBay search failed: {e}")
+
     valuation = calculate_fair_value(sold_items)
 
     # If refined query found nothing, fall back to the base query
     if valuation["fair_value"] <= 0 and search_query != body.query:
         print(f"[sell_advisor] Refined query '{search_query}' found nothing, falling back to '{body.query}'")
-        sold_items = search_sold(body.query)
+        try:
+            sold_items = search_sold(body.query)
+        except (_requests.RequestException, RuntimeError):
+            pass
         valuation = calculate_fair_value(sold_items)
 
     fair_value = valuation["fair_value"]
