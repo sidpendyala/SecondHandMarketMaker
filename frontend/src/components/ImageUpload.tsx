@@ -7,6 +7,7 @@ import {
   Loader2,
   CheckCircle2,
   X,
+  Lightbulb,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,18 +18,23 @@ interface ImageUploadProps {
   onConditionResult: (result: ConditionResult) => void;
   uploadImage: (file: File) => Promise<ConditionResult>;
   isLoading?: boolean;
+  searchQuery?: string;
+  onProductSuggestionAccepted?: (detectedProduct: string) => void;
 }
 
 export default function ImageUpload({
   onConditionResult,
   uploadImage,
   isLoading: externalLoading,
+  searchQuery,
+  onProductSuggestionAccepted,
 }: ImageUploadProps) {
   const [dragOver, setDragOver] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ConditionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [suggestionDismissed, setSuggestionDismissed] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const isProcessing = loading || externalLoading;
@@ -49,6 +55,7 @@ export default function ImageUpload({
       setLoading(true);
       setError(null);
       setResult(null);
+      setSuggestionDismissed(false);
 
       try {
         const conditionResult = await uploadImage(file);
@@ -87,6 +94,7 @@ export default function ImageUpload({
     setPreview(null);
     setResult(null);
     setError(null);
+    setSuggestionDismissed(false);
     if (inputRef.current) inputRef.current.value = "";
   }, []);
 
@@ -96,6 +104,13 @@ export default function ImageUpload({
     if (rating >= 4) return "bg-amber-500";
     return "bg-red-500";
   };
+
+  // Should we show the product suggestion?
+  const showSuggestion =
+    result?.detected_product &&
+    !suggestionDismissed &&
+    !isProcessing &&
+    result.source !== "mock";
 
   return (
     <Card className="border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
@@ -194,9 +209,54 @@ export default function ImageUpload({
                     {result.notes}
                   </p>
                 )}
+
+                {/* Product suggestion — dismissible */}
+                {showSuggestion && (
+                  <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-900/50 dark:bg-blue-950/30">
+                    <div className="flex items-start gap-2">
+                      <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-medium text-blue-700 dark:text-blue-300">
+                          We think this looks like:
+                        </p>
+                        <p className="mt-0.5 text-sm font-semibold text-blue-800 dark:text-blue-200">
+                          {result.detected_product}
+                        </p>
+                        {searchQuery && (
+                          <p className="mt-1 text-[11px] text-blue-500 dark:text-blue-400">
+                            You searched for &quot;{searchQuery}&quot;
+                          </p>
+                        )}
+                        <div className="mt-2 flex items-center gap-2">
+                          {onProductSuggestionAccepted && (
+                            <button
+                              onClick={() => {
+                                onProductSuggestionAccepted(
+                                  result.detected_product!
+                                );
+                                setSuggestionDismissed(true);
+                              }}
+                              className="rounded-md bg-blue-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700"
+                            >
+                              Use this instead
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setSuggestionDismissed(true)}
+                            className="rounded-md bg-white px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200 transition-colors hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-400 dark:ring-slate-700 dark:hover:bg-slate-700"
+                          >
+                            Ignore
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {result.source === "mock" && (
                   <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-400">
-                    Demo mode – Add OpenAI billing credits or GEMINI_API_KEY for real AI vision
+                    Demo mode – Add OpenAI billing credits or GEMINI_API_KEY for
+                    real AI vision
                   </div>
                 )}
               </div>

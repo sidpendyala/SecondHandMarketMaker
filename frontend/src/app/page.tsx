@@ -56,6 +56,9 @@ export default function Home() {
     {}
   );
   const [priceRefreshing, setPriceRefreshing] = useState(false);
+  const [searchBarQuery, setSearchBarQuery] = useState<string | undefined>(
+    undefined
+  );
   const currentSellQuery = useRef<string>("");
 
   const handleSearch = useCallback(
@@ -180,6 +183,17 @@ export default function Home() {
     [sellCondition, refreshSellAdvisor]
   );
 
+  const handleProductSuggestion = useCallback(
+    (detectedProduct: string) => {
+      // Re-run the sell search with the AI-detected product name
+      if (detectedProduct && detectedProduct !== currentSellQuery.current) {
+        setSearchBarQuery(detectedProduct);
+        handleSearch(detectedProduct);
+      }
+    },
+    [handleSearch]
+  );
+
   const hasData = (mode === "buy" ? !!buyData : !!sellData) && showResults;
 
   return (
@@ -190,6 +204,7 @@ export default function Home() {
         isLoading={isLoading}
         mode={mode}
         onModeChange={handleModeChange}
+        externalQuery={searchBarQuery}
       />
 
       {/* Main Content */}
@@ -388,6 +403,11 @@ export default function Home() {
             uploadImage={uploadImage}
             detectedAttributes={detectedAttrs}
             priceRefreshing={priceRefreshing}
+            onProductSuggestionAccepted={handleProductSuggestion}
+            hasUserInput={
+              sellCondition !== undefined ||
+              Object.values(sellDetails).some((v) => !!v)
+            }
           />
         )}
 

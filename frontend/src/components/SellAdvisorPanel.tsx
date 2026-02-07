@@ -29,6 +29,8 @@ interface SellAdvisorPanelProps {
   uploadImage: (file: File) => Promise<ConditionResult>;
   detectedAttributes?: Record<string, string>;
   priceRefreshing?: boolean;
+  onProductSuggestionAccepted?: (detectedProduct: string) => void;
+  hasUserInput?: boolean;
 }
 
 const tierMeta: Record<
@@ -75,6 +77,8 @@ export default function SellAdvisorPanel({
   uploadImage,
   detectedAttributes,
   priceRefreshing,
+  onProductSuggestionAccepted,
+  hasUserInput,
 }: SellAdvisorPanelProps) {
   const confidenceColor = {
     high: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
@@ -141,6 +145,8 @@ export default function SellAdvisorPanel({
         <ImageUpload
           onConditionResult={onConditionResult}
           uploadImage={uploadImage}
+          searchQuery={data.query}
+          onProductSuggestionAccepted={onProductSuggestionAccepted}
         />
         <SmartFieldsForm
           fields={productFields}
@@ -160,10 +166,23 @@ export default function SellAdvisorPanel({
         </div>
       )}
 
-      {/* Pricing Tiers */}
-      <h3 className="mb-4 text-lg font-semibold text-slate-800 dark:text-slate-200">
-        Recommended Pricing Tiers
-      </h3>
+      {/* Prompt to provide input before showing tiers */}
+      {!hasUserInput && !priceRefreshing && (
+        <div className="rounded-xl border border-dashed border-slate-300 py-10 text-center dark:border-slate-700">
+          <DollarSign className="mx-auto mb-3 h-10 w-10 text-slate-300 dark:text-slate-600" />
+          <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+            Upload a photo or fill in product details above to get personalized
+            pricing tiers
+          </p>
+        </div>
+      )}
+
+      {/* Pricing Tiers — only show once user has provided input */}
+      {hasUserInput && (
+        <>
+          <h3 className="mb-4 text-lg font-semibold text-slate-800 dark:text-slate-200">
+            Recommended Pricing Tiers
+          </h3>
       <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 transition-opacity duration-300 ${priceRefreshing ? "opacity-50" : "opacity-100"}`}>
         {data.tiers.map((tier) => {
           const config = tierMeta[tier.name] || {
@@ -234,6 +253,8 @@ export default function SellAdvisorPanel({
           );
         })}
       </div>
+        </>
+      )}
     </div>
   );
 }

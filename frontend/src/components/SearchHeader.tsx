@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, TrendingUp, Loader2, ShoppingCart, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -11,6 +11,7 @@ interface SearchHeaderProps {
   isLoading: boolean;
   mode: Mode;
   onModeChange: (mode: Mode) => void;
+  externalQuery?: string;
 }
 
 export default function SearchHeader({
@@ -18,8 +19,17 @@ export default function SearchHeader({
   isLoading,
   mode,
   onModeChange,
+  externalQuery,
 }: SearchHeaderProps) {
   const [query, setQuery] = useState("");
+
+  // Sync search bar text when parent pushes a new query (e.g. AI suggestion accepted)
+  useEffect(() => {
+    if (externalQuery !== undefined && externalQuery !== query) {
+      setQuery(externalQuery);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalQuery]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

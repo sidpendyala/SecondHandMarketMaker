@@ -59,6 +59,7 @@ export default function ProgressLoader({
   const rafRef = useRef<number | null>(null);
   const completionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startTimeRef = useRef<number>(0);
+  const wasLoadingRef = useRef(false);
   const onCompleteRef = useRef(onComplete);
 
   // Keep onComplete ref fresh without triggering effects
@@ -89,6 +90,8 @@ export default function ProgressLoader({
   useEffect(() => {
     if (isLoading) {
       // === STARTING ===
+      wasLoadingRef.current = true;
+
       // Clear any leftover completion timer from a previous run
       if (completionTimerRef.current) {
         clearTimeout(completionTimerRef.current);
@@ -106,34 +109,26 @@ export default function ProgressLoader({
         rafRef.current = requestAnimationFrame(tick);
       };
       rafRef.current = requestAnimationFrame(tick);
-    } else {
+    } else if (wasLoadingRef.current) {
       // === FINISHED ===
+      wasLoadingRef.current = false;
+
       // Stop the animation loop
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       }
 
-      // Only do the completion dance if we were actually visible (i.e. we loaded)
-      // Use a microtask check: if visible was never set, just fire onComplete
-      setProgress((prev) => {
-        if (prev > 0) {
-          // We were animating — snap to 100% and show completion
-          setCompleted(true);
+      // Snap to 100% and show completion animation
+      setProgress(100);
+      setCompleted(true);
 
-          completionTimerRef.current = setTimeout(() => {
-            setVisible(false);
-            setProgress(0);
-            setCompleted(false);
-            onCompleteRef.current?.();
-          }, 700);
-
-          return 100;
-        }
-        // Never started animating — fire onComplete immediately
+      completionTimerRef.current = setTimeout(() => {
+        setVisible(false);
+        setProgress(0);
+        setCompleted(false);
         onCompleteRef.current?.();
-        return 0;
-      });
+      }, 700);
     }
 
     return () => {
