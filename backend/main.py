@@ -432,6 +432,12 @@ async def verify_condition(body: ConditionRequest):
     return ConditionResponse(**result)
 
 
+@app.get("/")
+async def root():
+    """Root route so GET/HEAD / return 200 (e.g. for Render health checks)."""
+    return {"service": "MarketMaker API", "docs": "/docs", "health": "/health"}
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "MarketMaker API"}
