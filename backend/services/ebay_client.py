@@ -240,7 +240,7 @@ def scrape_listing_condition(listing_url: str) -> dict | None:
             f"{BASE_URL}/product_get.php",
             headers=_get_headers(),
             params={"url": listing_url},
-            timeout=15,
+            timeout=30,
         )
         resp.raise_for_status()
         body = _get_product_body(resp)

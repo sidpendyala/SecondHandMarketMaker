@@ -231,6 +231,10 @@ async def market_maker(query: str = Query(..., min_length=2, description="Produc
     # First pass: many deals already have condition from search subTitles
     # Second pass: for deals missing condition, scrape the listing page
     needs_scrape = [d for d in enriched if d.get("condition_rating") is None]
+    # Cap scrapes so we don't hammer RapidAPI (slow product_get.php) and avoid timeouts
+    max_condition_scrapes = 10
+    if len(needs_scrape) > max_condition_scrapes:
+        needs_scrape = needs_scrape[:max_condition_scrapes]
 
     if needs_scrape:
         async def _scrape_one(deal: dict) -> dict:
