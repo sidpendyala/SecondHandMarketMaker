@@ -27,13 +27,24 @@ export default function StatsPanel({ data }: StatsPanelProps) {
       </div>
 
       {/* Stats ticker row */}
-      <div className="grid grid-cols-2 gap-px bg-[#2a2520] lg:grid-cols-4">
+      <div
+        className={`grid grid-cols-2 gap-px bg-[#2a2520] ${data.manufacturer_price != null ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}
+      >
         {[
           {
             label: "FAIR VALUE",
             value: `$${data.fair_value.toFixed(2)}`,
             color: "text-[#39ff14]",
           },
+          ...(data.manufacturer_price != null
+            ? [
+                {
+                  label: "BRAND (MSRP)",
+                  value: `$${data.manufacturer_price.toFixed(2)}`,
+                  color: "text-[#e8e6e3]" as const,
+                },
+              ]
+            : []),
           {
             label: "AVG SOLD",
             value: `$${data.mean_price.toFixed(2)}`,
@@ -60,6 +71,11 @@ export default function StatsPanel({ data }: StatsPanelProps) {
           </div>
         ))}
       </div>
+      {data.manufacturer_price != null && (
+        <div className="mt-px bg-[#0d0b09] px-3 py-1 text-[9px] text-[#6b6560]">
+          BRAND (MSRP) = official manufacturer retail price (from AI)
+        </div>
+      )}
 
       {/* Best deal ticker */}
       {data.deals.length > 0 && (

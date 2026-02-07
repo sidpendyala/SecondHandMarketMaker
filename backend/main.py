@@ -31,6 +31,7 @@ from services.ai_service import (
     detect_and_analyze_image,
     generate_product_fields,
     check_query_refinement,
+    get_brand_retail_price,
 )
 
 
@@ -100,6 +101,7 @@ class MarketMakerResponse(BaseModel):
     total_active: int
     deals_eliminated: int
     filtered_items: list[FilteredItem] = []
+    manufacturer_price: Optional[float] = None  # brand/manufacturer retail (MSRP) from OpenAI or Gemini
 
 
 class PriceTier(BaseModel):
@@ -213,6 +215,12 @@ async def market_maker(query: str = Query(..., min_length=2, description="Produc
     except _requests.RequestException as e:
         raise HTTPException(status_code=502, detail=f"eBay search failed: {e}")
 
+    # Step 3b – Brand/manufacturer retail price (what the brand sells for) via OpenAI or Gemini
+    try:
+        manufacturer_price = get_brand_retail_price(query)
+    except Exception:
+        manufacturer_price = None
+
     # Step 4 – Filter deals (price threshold)
     deals = find_deals(active_items, fair_value)
 
@@ -296,6 +304,7 @@ async def market_maker(query: str = Query(..., min_length=2, description="Produc
         total_active=len(active_items),
         deals_eliminated=total_eliminated,
         filtered_items=filtered_models,
+        manufacturer_price=manufacturer_price,
     )
 
 

@@ -154,6 +154,26 @@ RULES:
 Query: """
 
 
+BRAND_RETAIL_PRICE_PROMPT = """You are a product pricing expert. Given a product name or search query, return the current MANUFACTURER / BRAND retail price — i.e. what the brand itself sells the product for (MSRP or official list price from the manufacturer's website or official retailers), NOT third-party or marketplace prices.
+
+Return ONLY a JSON object (no markdown, no code fences):
+{
+  "price_usd": <number or null>,
+  "discontinued": <true if the brand has discontinued this product; false if still sold by the brand>,
+  "note": "<optional one-line note, e.g. 'Sony US MSRP'>"
+}
+
+RULES:
+- Match the EXACT product and generation the user asked for. NEVER return a newer generation's price for an older one (e.g. if the user asks for "AirPods Pro 2", do NOT return AirPods Pro 3's $249 — Pro 2 is superseded, so set discontinued: true and do not show that price).
+- Use USD. If you only know another currency, convert to USD at current approximate rates.
+- discontinued: true if the manufacturer/brand NO LONGER sells this exact product. This includes: officially discontinued, end-of-life, or SUPERSEDED BY A NEWER MODEL (e.g. "iPad Air 5th Gen", "AirPods Pro 2" are discontinued because Apple now sells newer generations). When in doubt that the brand still sells this specific model, set discontinued to true.
+- price_usd must be the MSRP for THIS exact model only when the brand still sells it; use null if discontinued or no reliable price. If discontinued is true, we ignore price_usd and do not show MSRP.
+- Prefer the brand's own US MSRP or the price on the brand's official site. Do NOT use the cheapest eBay/Amazon listing.
+- For products with multiple SKUs (e.g. different storage), use the most common or base model's price.
+
+Product query: """
+
+
 # ---------------------------------------------------------------------------
 # Cache paths (used by refinement and product fields caches)
 # ---------------------------------------------------------------------------
@@ -852,6 +872,98 @@ def check_query_refinement(query: str) -> dict:
     fallback = {"needs_refinement": False, "fields": []}
     _cache_refinement(query, fallback)
     return fallback
+
+
+# ---------------------------------------------------------------------------
+# Brand / manufacturer retail price (OpenAI or Gemini)
+# ---------------------------------------------------------------------------
+
+def _parse_brand_price_response(raw: str) -> tuple[float | None, bool]:
+    """
+    Parse price_usd and discontinued from AI response.
+    Returns (price_usd or None, discontinued). If JSON fails, (fallback_price, False).
+    """
+    if not raw or not raw.strip():
+        return (None, False)
+    text = raw.strip()
+    # Try JSON first
+    try:
+        if text.startswith("```"):
+            text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+            if text.endswith("```"):
+                text = text[:-3]
+            text = text.strip()
+        data = json.loads(text)
+        discontinued = bool(data.get("discontinued", False))
+        val = data.get("price_usd")
+        if val is None:
+            return (None, discontinued)
+        p = float(val)
+        price = round(p, 2) if p > 0 else None
+        return (price, discontinued)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        pass
+    # Fallback: find $XX.XX or XX.XX in text (no discontinued info, assume not discontinued)
+    match = re.search(r"\$?\s*(\d{1,6}(?:\.\d{2})?)", text)
+    if match:
+        p = float(match.group(1))
+        return (round(p, 2) if p > 0 else None, False)
+    return (None, False)
+
+
+def _openai_brand_retail_price(query: str) -> float | None:
+    """Use OpenAI to get manufacturer/brand retail price for the product. Returns None if discontinued or no price."""
+    if not _has_openai_key():
+        return None
+    try:
+        client = _get_openai_client()
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": BRAND_RETAIL_PRICE_PROMPT + query}],
+            max_tokens=150,
+        )
+        raw = response.choices[0].message.content or ""
+        price, discontinued = _parse_brand_price_response(raw)
+        if discontinued or price is None:
+            return None
+        return price
+    except Exception as exc:
+        print(f"[ai_service] OpenAI brand price error: {exc}")
+        return None
+
+
+def _gemini_brand_retail_price(query: str) -> float | None:
+    """Use Gemini to get manufacturer/brand retail price for the product. Returns None if discontinued or no price."""
+    if not _has_gemini_key():
+        return None
+    genai = _configure_gemini()
+    if not genai:
+        return None
+    try:
+        model = genai.GenerativeModel("gemini-2.0-flash")
+        response = model.generate_content(
+            BRAND_RETAIL_PRICE_PROMPT + query,
+            generation_config=genai.GenerationConfig(max_output_tokens=150),
+        )
+        raw = response.text if response else ""
+        price, discontinued = _parse_brand_price_response(raw)
+        if discontinued or price is None:
+            return None
+        return price
+    except Exception as exc:
+        print(f"[ai_service] Gemini brand price error: {exc}")
+        return None
+
+
+def get_brand_retail_price(query: str) -> float | None:
+    """
+    Get the manufacturer/brand retail price (what the brand sells for) using AI.
+    Tries OpenAI first, then Gemini. Returns None if unavailable, no price, or product is discontinued by the brand.
+    """
+    result = _openai_brand_retail_price(query)
+    if result is not None:
+        return result
+    return _gemini_brand_retail_price(query)
 
 
 # ---------------------------------------------------------------------------

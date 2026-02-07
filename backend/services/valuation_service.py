@@ -64,11 +64,23 @@ def calculate_fair_value(sold_items: list[dict]) -> dict:
     }
 
 
+def _normalize_dedup_key(url: str, title: str, price: float, image: str = "") -> tuple[str, str, str]:
+    """Normalize URL for dedup; title+price key; and image+price key (catches same listing, different URLs)."""
+    base = (url or "").split("?")[0].split("#")[0].rstrip("/").lower()
+    # Aggressive title norm so "Headphones - Excellent" and "Headphones – Excellent" match
+    t = re.sub(r"[^a-z0-9\s]", "", (title or "").lower())
+    title_norm = " ".join(t.split())[:100]
+    price_rounded = round(float(price), 2)
+    title_price_key = f"{title_norm}|{price_rounded}"
+    image_price_key = f"{(image or '').strip()}|{price_rounded}" if image else ""
+    return base, title_price_key, image_price_key
+
+
 def find_deals(active_items: list[dict], fair_value: float, threshold: float = 0.20) -> list[dict]:
     """
     Filter active listings that are priced at least `threshold` (default 20 %)
-    below the Fair Market Value. Deduplicates by URL so the same listing
-    never appears twice (API can return duplicates).
+    below the Fair Market Value. Deduplicates by normalized URL and by
+    (title, price) so the same listing never appears twice.
 
     Each returned item gets extra fields:
       - discount_pct: percentage below fair value (e.g. 25.3)
@@ -78,17 +90,29 @@ def find_deals(active_items: list[dict], fair_value: float, threshold: float = 0
         return []
 
     seen_urls: set[str] = set()
+    seen_title_price: set[str] = set()
+    seen_image_price: set[str] = set()
     deals = []
     for item in active_items:
         url = item.get("url") or ""
-        if url and url in seen_urls:
-            continue
-        if url:
-            seen_urls.add(url)
-
+        title = item.get("title") or ""
         price = item.get("price", 0)
+        image = item.get("image") or ""
         if price <= 0:
             continue
+
+        base_url, title_price_key, image_price_key = _normalize_dedup_key(url, title, price, image)
+        if base_url and base_url in seen_urls:
+            continue
+        if title_price_key in seen_title_price:
+            continue
+        if image_price_key and image_price_key in seen_image_price:
+            continue
+        if base_url:
+            seen_urls.add(base_url)
+        seen_title_price.add(title_price_key)
+        if image_price_key:
+            seen_image_price.add(image_price_key)
 
         discount = (fair_value - price) / fair_value
         if discount >= threshold:

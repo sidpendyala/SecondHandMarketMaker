@@ -17,6 +17,8 @@ eBay URL parameters used:
 
 import os
 import urllib.parse
+from typing import Optional
+
 import requests
 
 
@@ -324,3 +326,28 @@ def search_active(query: str) -> list[dict]:
     items = [_normalize_product(p, status="active") for p in raw_products]
     items = [i for i in items if i["price"] > 0]
     return items
+
+
+def get_new_listing_price(query: str) -> Optional[float]:
+    """
+    Fetch the lowest "New" condition listing price for the query (proxy for
+    manufacturer/retail price when still sold new). Returns None if no new
+    listings or on failure.
+    """
+    if not _has_api_key():
+        return None
+    try:
+        # LH_ItemCondition=1000 = New (eBay condition ID)
+        ebay_url = _build_ebay_search_url(
+            query,
+            LH_BIN="1",
+            _sop="15",  # price low first
+            LH_ItemCondition="1000",
+        )
+        raw_products = _fetch_search(ebay_url)
+        items = [_normalize_product(p, status="active") for p in raw_products]
+        prices = [i["price"] for i in items if i["price"] > 0]
+        return round(min(prices), 2) if prices else None
+    except Exception as exc:
+        print(f"[ebay_client] get_new_listing_price error: {exc}")
+        return None

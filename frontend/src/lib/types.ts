@@ -39,6 +39,8 @@ export interface AnalyzeResponse {
   total_active: number;
   deals_eliminated: number;
   filtered_items: FilteredItem[];
+  /** Lowest "New" condition listing price (if still sold new) — reference for what a new one costs */
+  manufacturer_price?: number | null;
 }
 
 export interface PriceTier {
