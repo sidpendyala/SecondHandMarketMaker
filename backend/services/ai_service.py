@@ -100,8 +100,9 @@ ALWAYS include:
 
 NEVER include:
 - Brand (already in the product name)
-- Model number (already in the product name)  
+- Model number (already in the product name)
 - Processor/chip type if already specified
+- Memory, RAM, Logic Board, Motherboard, or any internal/repair/parts attributes (buyers search for complete devices, not components)
 - Overly technical specs that most buyers don't filter by
 
 Return ONLY valid JSON. Product: """
@@ -142,10 +143,13 @@ RULES:
 - Only flag as BROAD if adding parameters would genuinely help narrow eBay search results.
 - Do NOT include brand (it's already in the query).
 - Keep it practical: 2-4 fields max, 3-6 options each.
-- For electronics (MacBook, iPhone, iPad, laptops, etc.): prioritize chip/model generation, then storage, then YEAR. For YEAR/release year: ALWAYS list the most RECENT years first. Use the current and previous 4-5 years (e.g. 2025, 2024, 2023, 2022, 2021). Do NOT suggest only old years like 2020 or 2019 unless the product line genuinely has no newer models. For "MacBook Air" the year options should include 2024, 2023, 2022 (M2), and 2020 (M1) — recent first.
+- For laptops (MacBook, etc.): suggest ONLY attributes buyers use when searching for a complete machine: Year (release year), Chip/Model (e.g. M1, M2, M3), Storage (e.g. 256GB, 512GB), Screen size (e.g. 13", 15") if relevant, Color. Do NOT suggest: Memory, RAM, Logic Board, Motherboard, or any internal/repair/parts terms. Buyers search for "MacBook Air M2 256GB 2022", not for RAM or logic board.
+- For phones/tablets (iPhone, iPad, etc.): Year, Model (e.g. 15 Pro), Storage, Color. No internal components.
+- For other electronics: prioritize model/generation, then storage/capacity, then year. No repair or parts terms.
 - For clothing: prioritize size, color, style.
 - For vehicles: prioritize year (recent first), mileage, trim.
-- Options must be what buyers actually search for today; prefer current and recent generations over discontinued ones.
+- For YEAR: list the most RECENT years first (e.g. 2025, 2024, 2023, 2022). Do not suggest only old years unless the product has no newer models.
+- Options must be what buyers actually type into search; prefer current and recent generations. Never suggest fields that describe parts, repairs, or internal components.
 
 Query: """
 

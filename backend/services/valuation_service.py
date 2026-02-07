@@ -230,11 +230,13 @@ SCAM_KEYWORDS = [
     "no item", "no product", "no phone", "no console", "no laptop",
     "no tablet", "no headphones", "no earbuds",
     "image only", "photo only", "picture only", "digital download",
+    "parts only", "logic board only", "memory only", "ram only",
 ]
 
 # Keywords for accessories / peripheral items that aren't the main product
-# These are checked as substrings in the listing title
+# These are checked as substrings in the listing title (eBay returns parts/accessories in search)
 ACCESSORY_KEYWORDS = [
+    # ---- General accessories ----
     "case for", "cover for", "skin for", "sleeve for",
     "screen protector", "tempered glass", "glass protector",
     "charger for", "cable for", "adapter for", "cord for",
@@ -254,6 +256,20 @@ ACCESSORY_KEYWORDS = [
     "keyboard cover", "trackpad cover",
     "dust plug", "port cover",
     "replacement battery", "battery pack",
+    # ---- Parts / components (eBay often returns these for "macbook", "iphone", etc.) ----
+    "logic board", "logicboard",
+    "motherboard", "mainboard",
+    "memory module", "ram module", "ram only", "memory only",
+    "replacement memory", "replacement ram",
+    "palmrest", "palm rest", "top case", "topcase", "bottom case",
+    "keyboard assembly", "trackpad assembly", "touchpad assembly",
+    "display assembly", "lcd assembly", "screen assembly",
+    "battery only", "charger only", "dock only", "cable only",
+    "ssd only", "hard drive only", "storage only",
+    "screen only", "display only", "lcd only",
+    "flex cable", "ribbon cable", "dc in board", "magsafe board",
+    "replacement screen", "replacement lcd", "replacement display",
+    "for parts", "parts only",
 ]
 
 # Standalone words that indicate an accessory when combined with
