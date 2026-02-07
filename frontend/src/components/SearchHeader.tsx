@@ -114,8 +114,11 @@ export default function SearchHeader({
           </div>
         </form>
 
-        {/* Quick tickers */}
+        {/* Example search buttons */}
         <div className="mt-2 flex flex-wrap items-center gap-1">
+          <span className="mr-1 text-[10px] text-[#6b6560]">
+            Examples:
+          </span>
           {suggestions.map((s) => (
             <button
               key={s}
