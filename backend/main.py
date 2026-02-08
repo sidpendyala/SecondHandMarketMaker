@@ -213,7 +213,10 @@ async def market_maker(query: str = Query(..., min_length=2, description="Produc
         _sold(), _active(), _brand_price()
     )
 
-    # Step 2 – Valuation
+    # -------------------------------------------------------------------------
+    # Phase 1: Indexing complete — valuation from ALL sold data (unchanged)
+    # Fair value and avg sell price are computed from full sold set only.
+    # -------------------------------------------------------------------------
     valuation = calculate_fair_value(sold_items)
     fair_value = valuation["fair_value"]
 
@@ -223,13 +226,14 @@ async def market_maker(query: str = Query(..., min_length=2, description="Produc
             detail=f"Could not determine fair value for '{query}'. Try a different search.",
         )
 
-    # Step 4 – Filter deals (price threshold)
+    # -------------------------------------------------------------------------
+    # Phase 2: Only values below market value — deal pipeline runs AFTER indexing.
+    # All downstream work (scam filter, condition scrapes, scoring) uses only
+    # active listings that are below fair value; valuation stats stay untouched.
+    # -------------------------------------------------------------------------
     deals = find_deals(active_items, fair_value)
-
-    # Step 5 – Smart filter: remove scams, fakes, and mismatched products
     deals, suspicious_items = filter_suspicious_deals(deals, fair_value, query)
 
-    # Step 6 – Enrich deals with flip-profit data
     enriched = []
     for d in deals:
         flip = calculate_flip_profit(d["price"], fair_value)
@@ -237,11 +241,9 @@ async def market_maker(query: str = Query(..., min_length=2, description="Produc
         d["flip_roi"] = flip["roi_pct"]
         enriched.append(d)
 
-    # Step 7 – Condition analysis from eBay listing data (not GPT Vision)
-    # First pass: many deals already have condition from search subTitles
-    # Second pass: for deals missing condition, scrape the listing page
+    # Condition scrapes only for below-market deals (not full active list)
     needs_scrape = [d for d in enriched if d.get("condition_rating") is None]
-    max_condition_scrapes = 5  # cap to keep load time down (product_get.php is slow)
+    max_condition_scrapes = 5
     if len(needs_scrape) > max_condition_scrapes:
         needs_scrape = needs_scrape[:max_condition_scrapes]
 
@@ -261,7 +263,7 @@ async def market_maker(query: str = Query(..., min_length=2, description="Produc
 
         await asyncio.gather(*[_scrape_one(d) for d in needs_scrape])
 
-    # Step 8 – Condition-based filtering and scoring
+    # Condition-based filtering and scoring (still only below-market deals)
     scored_deals, condition_eliminated = apply_condition_scoring(enriched)
 
     # Combine all filtered items for the response
