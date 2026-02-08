@@ -9,6 +9,7 @@ from typing import Optional
 
 from fastapi import FastAPI, Query, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
@@ -443,10 +444,21 @@ async def verify_condition(body: ConditionRequest):
 
 @app.get("/")
 async def root():
-    """Root route so GET/HEAD / return 200 (e.g. for Render health checks)."""
+    """Root route so GET / returns 200 (e.g. for Render health checks)."""
     return {"service": "MarketMaker API", "docs": "/docs", "health": "/health"}
+
+
+@app.head("/")
+async def root_head():
+    """Allow HEAD / for health checks and probes (avoid 405 Method Not Allowed)."""
+    return Response(status_code=200)
 
 
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "MarketMaker API"}
+
+
+@app.head("/health")
+async def health_head():
+    return Response(status_code=200)
