@@ -13,19 +13,24 @@ import threading
 
 from openai import OpenAI
 
-# Lazy-load Gemini to avoid import errors if not installed
-_gemini = None
+# Lazy-load Gemini (google-genai) to avoid import errors if not installed
+_gemini_client = None
 
 
-def _get_gemini():
-    global _gemini
-    if _gemini is None:
-        try:
-            import google.generativeai as genai
-            _gemini = genai
-        except ImportError:
-            _gemini = False  # Mark as unavailable
-    return _gemini if _gemini else None
+def _get_gemini_client():
+    """Return google.genai Client or None if unavailable."""
+    global _gemini_client
+    if _gemini_client is not None:
+        return _gemini_client
+    if not _has_gemini_key():
+        return None
+    try:
+        from google import genai
+        from google.genai import types
+        _gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+        return _gemini_client
+    except ImportError:
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -247,10 +252,8 @@ def _get_openai_client() -> OpenAI:
 
 
 def _configure_gemini():
-    genai = _get_gemini()
-    if genai:
-        genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-    return genai
+    """Return Gemini client (for backward compatibility with callers that check for None)."""
+    return _get_gemini_client()
 
 
 # ---------------------------------------------------------------------------
@@ -414,13 +417,12 @@ def _openai_structured_condition(image_content: list) -> dict | None:
 
 def _gemini_structured_condition_base64(base64_data: str) -> dict | None:
     """Try Google Gemini for structured condition analysis from base64 image."""
-    if not _has_gemini_key():
-        return None
-    genai = _configure_gemini()
-    if not genai:
+    client = _get_gemini_client()
+    if not client:
         return None
 
     try:
+        from google.genai import types
         # Extract mime type and raw base64 from data URL
         # Format: "data:image/jpeg;base64,/9j/4AAQ..."
         if base64_data.startswith("data:"):
@@ -433,13 +435,13 @@ def _gemini_structured_condition_base64(base64_data: str) -> dict | None:
         import base64
         image_bytes = base64.b64decode(b64_str)
 
-        model = genai.GenerativeModel("gemini-2.0-flash")
-        response = model.generate_content(
-            [
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=[
                 STRUCTURED_CONDITION_PROMPT,
-                {"mime_type": mime_type, "data": image_bytes},
+                types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
             ],
-            generation_config=genai.GenerationConfig(max_output_tokens=300),
+            config=types.GenerateContentConfig(max_output_tokens=300),
         )
 
         raw = response.text
@@ -460,27 +462,26 @@ def _gemini_structured_condition_base64(base64_data: str) -> dict | None:
 
 def _gemini_structured_condition_url(image_url: str) -> dict | None:
     """Try Google Gemini for structured condition analysis from URL."""
-    if not _has_gemini_key():
-        return None
-    genai = _configure_gemini()
-    if not genai:
+    client = _get_gemini_client()
+    if not client:
         return None
 
     try:
+        from google.genai import types
         # Gemini can't directly access URLs, so download the image first
         import requests as _requests
         resp = _requests.get(image_url, timeout=10)
         resp.raise_for_status()
         image_bytes = resp.content
-        content_type = resp.headers.get("Content-Type", "image/jpeg")
+        content_type = resp.headers.get("Content-Type", "image/jpeg") or "image/jpeg"
 
-        model = genai.GenerativeModel("gemini-2.0-flash")
-        response = model.generate_content(
-            [
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=[
                 STRUCTURED_CONDITION_PROMPT,
-                {"mime_type": content_type, "data": image_bytes},
+                types.Part.from_bytes(data=image_bytes, mime_type=content_type),
             ],
-            generation_config=genai.GenerationConfig(max_output_tokens=300),
+            config=types.GenerateContentConfig(max_output_tokens=300),
         )
 
         raw = response.text
@@ -586,13 +587,12 @@ Return ONLY valid JSON."""
 
 def _gemini_detect_and_analyze(base64_data: str) -> dict | None:
     """Use Gemini to detect product + analyze condition from base64 image."""
-    if not _has_gemini_key():
-        return None
-    genai = _configure_gemini()
-    if not genai:
+    client = _get_gemini_client()
+    if not client:
         return None
 
     try:
+        from google.genai import types
         if base64_data.startswith("data:"):
             header, b64_str = base64_data.split(",", 1)
             mime_type = header.split(":")[1].split(";")[0]
@@ -603,13 +603,13 @@ def _gemini_detect_and_analyze(base64_data: str) -> dict | None:
         import base64
         image_bytes = base64.b64decode(b64_str)
 
-        model = genai.GenerativeModel("gemini-2.0-flash")
-        response = model.generate_content(
-            [
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=[
                 DETECT_AND_ANALYZE_PROMPT,
-                {"mime_type": mime_type, "data": image_bytes},
+                types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
             ],
-            generation_config=genai.GenerationConfig(max_output_tokens=500),
+            config=types.GenerateContentConfig(max_output_tokens=500),
         )
 
         raw = response.text
@@ -728,17 +728,16 @@ def _openai_generate_fields(product_name: str) -> list[dict] | None:
 
 def _gemini_generate_fields(product_name: str) -> list[dict] | None:
     """Try Google Gemini to generate product fields."""
-    if not _has_gemini_key():
-        return None
-    genai = _configure_gemini()
-    if not genai:
+    client = _get_gemini_client()
+    if not client:
         return None
 
     try:
-        model = genai.GenerativeModel("gemini-2.0-flash")
-        response = model.generate_content(
-            PRODUCT_FIELDS_PROMPT + product_name,
-            generation_config=genai.GenerationConfig(max_output_tokens=500),
+        from google.genai import types
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=PRODUCT_FIELDS_PROMPT + product_name,
+            config=types.GenerateContentConfig(max_output_tokens=500),
         )
         fields = _parse_json_response(response.text)
         if not isinstance(fields, list):
@@ -825,16 +824,15 @@ def _openai_refinement(query: str) -> dict | None:
 
 
 def _gemini_refinement(query: str) -> dict | None:
-    if not _has_gemini_key():
-        return None
-    genai = _configure_gemini()
-    if not genai:
+    client = _get_gemini_client()
+    if not client:
         return None
     try:
-        model = genai.GenerativeModel("gemini-2.0-flash")
-        response = model.generate_content(
-            QUERY_REFINEMENT_PROMPT + query,
-            generation_config=genai.GenerationConfig(max_output_tokens=500),
+        from google.genai import types
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=QUERY_REFINEMENT_PROMPT + query,
+            config=types.GenerateContentConfig(max_output_tokens=500),
         )
         raw = response.text
         print(f"[ai_service] Gemini refinement raw: {raw}")
@@ -904,17 +902,16 @@ def _openai_refine_query_to_string(query: str, reason: str) -> str | None:
 
 
 def _gemini_refine_query_to_string(query: str, reason: str) -> str | None:
-    if not _has_gemini_key():
-        return None
-    genai = _configure_gemini()
-    if not genai:
+    client = _get_gemini_client()
+    if not client:
         return None
     try:
+        from google.genai import types
         prompt = REFINE_QUERY_STRING_PROMPT % (reason, query)
-        model = genai.GenerativeModel("gemini-2.0-flash")
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.GenerationConfig(max_output_tokens=150),
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt,
+            config=types.GenerateContentConfig(max_output_tokens=150),
         )
         raw = (response.text or "").strip()
         return raw.strip('"\'') if raw else None
@@ -994,16 +991,15 @@ def _openai_brand_retail_price(query: str) -> float | None:
 
 def _gemini_brand_retail_price(query: str) -> float | None:
     """Use Gemini to get manufacturer/brand retail price for the product. Returns None if discontinued or no price."""
-    if not _has_gemini_key():
-        return None
-    genai = _configure_gemini()
-    if not genai:
+    client = _get_gemini_client()
+    if not client:
         return None
     try:
-        model = genai.GenerativeModel("gemini-2.0-flash")
-        response = model.generate_content(
-            BRAND_RETAIL_PRICE_PROMPT + query,
-            generation_config=genai.GenerationConfig(max_output_tokens=150),
+        from google.genai import types
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=BRAND_RETAIL_PRICE_PROMPT + query,
+            config=types.GenerateContentConfig(max_output_tokens=150),
         )
         raw = response.text if response else ""
         price, discontinued = _parse_brand_price_response(raw)
