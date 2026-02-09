@@ -155,4 +155,4 @@ SecondHandMarketMaker/
 | POST | `/api/analyze-upload` | Condition analysis from uploaded image |
 | POST | `/api/verify-condition` | Condition check from image URL |
 
-Full interactive docs: **https://secondhandmarketmaker.onrender.com/docs**
+Full interactive docs: **https://shmm.up.railway.app/docs**
