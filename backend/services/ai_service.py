@@ -875,6 +875,66 @@ def check_query_refinement(query: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Refine query to a single string (for agentic scan retry)
+# ---------------------------------------------------------------------------
+
+REFINE_QUERY_STRING_PROMPT = """The following eBay product search query returned poor or no results (reason: %s).
+
+Original query: %s
+
+Suggest ONE improved eBay search query string that is more specific or uses different terms likely to return better results. Return ONLY the improved search query string, nothing else — no explanation, no quotes, no JSON."""
+
+
+def _openai_refine_query_to_string(query: str, reason: str) -> str | None:
+    if not _has_openai_key():
+        return None
+    try:
+        client = _get_openai_client()
+        prompt = REFINE_QUERY_STRING_PROMPT % (reason, query)
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=150,
+        )
+        raw = (response.choices[0].message.content or "").strip()
+        return raw.strip('"\'') if raw else None
+    except Exception as exc:
+        print(f"[ai_service] OpenAI refine_query_to_string error: {exc}")
+        return None
+
+
+def _gemini_refine_query_to_string(query: str, reason: str) -> str | None:
+    if not _has_gemini_key():
+        return None
+    genai = _configure_gemini()
+    if not genai:
+        return None
+    try:
+        prompt = REFINE_QUERY_STRING_PROMPT % (reason, query)
+        model = genai.GenerativeModel("gemini-2.0-flash")
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.GenerationConfig(max_output_tokens=150),
+        )
+        raw = (response.text or "").strip()
+        return raw.strip('"\'') if raw else None
+    except Exception as exc:
+        print(f"[ai_service] Gemini refine_query_to_string error: {exc}")
+        return None
+
+
+def refine_query_to_string(query: str, reason: str = "poor_results") -> str | None:
+    """
+    Get a single improved search query string using AI (OpenAI then Gemini).
+    Used by agentic scan when initial results are poor. Returns None if no API key or failure.
+    """
+    result = _openai_refine_query_to_string(query, reason)
+    if result:
+        return result
+    return _gemini_refine_query_to_string(query, reason)
+
+
+# ---------------------------------------------------------------------------
 # Brand / manufacturer retail price (OpenAI or Gemini)
 # ---------------------------------------------------------------------------
 

@@ -76,6 +76,18 @@ def _normalize_dedup_key(url: str, title: str, price: float, image: str = "") ->
     return base, title_price_key, image_price_key
 
 
+def make_item_key(url: str, title: str, price: float, image: str = "") -> str:
+    """
+    Stable key for a listing (url base + normalized title + price + image if present).
+    Used for seen_items dedupe and alert_events. Max 512 chars for DB.
+    """
+    base, title_price_key, image_price_key = _normalize_dedup_key(url, title, price, image)
+    key = f"{base}|{title_price_key}"
+    if image_price_key:
+        key = f"{key}|{image_price_key}"
+    return key[:512]
+
+
 def find_deals(active_items: list[dict], fair_value: float, threshold: float = 0.15) -> list[dict]:
     """
     Filter active listings that are priced at least `threshold` (default 15 %)
@@ -375,6 +387,12 @@ def _extract_core_terms(query: str) -> list[str]:
     normalized = _normalize_text(query)
     tokens = normalized.split()
     return [t for t in tokens if t not in STOPWORDS and len(t) >= 2]
+
+
+def heuristic_refine_query(query: str) -> str:
+    """Remove stopwords and keep core terms; used as fallback when AI refinement is unavailable."""
+    terms = _extract_core_terms(query)
+    return " ".join(terms) if terms else query.strip()
 
 
 def filter_suspicious_deals(
