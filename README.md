@@ -3,6 +3,7 @@
 **AI-powered deal finder for second-hand goods on eBay.** Find underpriced listings, estimate fair market value, and get sell-side pricing advice—with optional AI refinement and condition analysis.
 
 **Live app:** [https://second-hand-market-maker.vercel.app](https://second-hand-market-maker.vercel.app)
+**Demo video:** [https://youtu.be/01nMWvEB2jM](https://youtu.be/01nMWvEB2jM) 
 
 ---
 
